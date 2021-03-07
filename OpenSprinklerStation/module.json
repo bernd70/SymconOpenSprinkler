@@ -1,0 +1,11 @@
+{
+	"id": "{DE0EA757-F6F3-4CC7-3FD0-39622E94EB35}",
+	"name": "OpenSprinklerStation",
+	"type": 3,
+	"vendor": "OpenSprinkler",
+	"aliases": [ "OpenSprinkler Station" ],
+	"parentRequirements": [ "{E04B8FB3-7E04-8240-B071-A4ACDF2D3BA1}" ],
+	"childRequirements": [],
+	"implemented": [ "{6B94F6BD-A4F6-87B3-A9D1-907A1D7C30EF}" ],
+	"prefix": "OpenSprinkler"
+}

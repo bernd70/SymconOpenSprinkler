@@ -1,0 +1,10 @@
+{
+    "translations": {
+        "de": {
+            "Station Configuration (Do not edit!)": "Stationskonfiguration (Nicht ändern!)",
+            "Station Index": "Stationsindex",
+            "Polling Interval": "Abfrageintervall",
+            "Activate exteded logging": "Erweitertes Logging aktivieren"
+        }
+    }
+}

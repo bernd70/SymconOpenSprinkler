@@ -1,0 +1,20 @@
+{
+    "elements": 
+    [
+        {
+            "type": "ExpansionPanel",
+            "caption": "Station Configuration (Do not edit!)",
+            "items":
+            [
+                { "type": "ValidationTextBox", "name" : "StationIndex", "caption": "Station Index" }
+            ]
+        }        
+    ],
+    "actions":
+    [
+        { "type": "Button", "label": "Enable", "onClick": "OpenSprinkler_Enable($id, true);" },
+        { "type": "Button", "label": "Disable", "onClick": "OpenSprinkler_Enable($id, false);" },
+        { "type": "Button", "label": "Start (30s)", "onClick": "OpenSprinkler_Run($id, true, 30);" },
+        { "type": "Button", "label": "Stop", "onClick": "OpenSprinkler_Run($id, false, 0);" }
+    ]
+  }
