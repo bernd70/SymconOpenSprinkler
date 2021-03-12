@@ -28,7 +28,7 @@ class BaseIPSModule extends IPSModule
                     $this->UnregisterMessage($sender, $msg);
             }
         }
-    }
+    } 
 }
 
 ?>

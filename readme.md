@@ -34,7 +34,7 @@ Mehr brauche ich persönlich in der täglichen Nutzung nicht. Ich kann aber bei 
 
 Die Einrichtung erfolgt über die Modulverwaltung von Symcon.
 
-Über das Modul-Control folgende URL hinzufügen: `git://github.com/bernd70/SymconJvcProjectorControl.git`  
+Über das Modul-Control folgende URL hinzufügen: `git://github.com/bernd70/SymconJvcProjectorControl.git`
 
 Danach können JVC Projektor Instanzen erstellt werden.
 
@@ -71,7 +71,7 @@ Name          | Typ                                 | Beschreibung              
 ------------- | ----------------------------------- | --------------------------------------- | ------------------------ | ----------------------------------
 Model         | String                              | Projektormodell                         |                          | Wird einmalig nach Ändern der Modulkonfiguration gelesen
 Power         | Boolean                             | Variable zum Schalten der Projektor     |                          | Die Variable "Power" dient zum einfachen ein- und ausschalten über das UI. Der Zustand ist true, wenn der PowerStatus "Powered On" ist, ansonsten ist sie false.
-PowerStatus   | JvcProjectorControl.PowerStatus     | Power Status                            |                          | 
+PowerStatus   | JvcProjectorControl.PowerStatus     | Power Status                            |                          |
 MACAddress    | string                              | MAC Adresse                             |                          |
 CurrentInput  | JvcProjectorControl.Input           | Aktueller Eingang                       | PowerStatus == PoweredOn |
 SourceStatus  | JvcProjectorControl.SourceStatus    | Status der Quelle                       | PowerStatus == PoweredOn |
@@ -122,36 +122,21 @@ Wert | Bezeichnung          | Anmerkung
 Soweit nicht anders angegeben, liefern die Funktionen keinen Rückgabewert.
 
 ```php
-JvcProjectorControl_GetProjectorStatus(integer $InstanzID);
+OpenSprinkler_EnableStation(integer $InstanzID, int $stationIndex);
 ```
-Liest den Status des Projektors mit der InstanzID $InstanzID und setzt alle Symcon Variablen.
+TBD
 
 ```php
-JvcProjectorControl_PowerOn(integer $InstanzID);
+OpenSprinkler_SwitchStation(integer $InstanzID, int $stationIndex);
 ```
-Schaltet den Projektor mit der InstanzID $InstanzID ein.
-Der Befehl kann nur ausgeführt werden, wenn der Projektor aus ist (PowerStatus = "Standby").
+TBD
 
 ```php
-JvcProjectorControl_PowerOff(integer $InstanzID);
+OpenSprinkler_StopAllStations(integer $InstanzID, string $programName);
 ```
-Schaltet den Projektor mit der InstanzID $InstanzID aus.
-Der Befehl kann nur ausgeführt werden, wenn der Projektor an ist (PowerStatus = "PoweredOn").
+TBD
 
 ```php
-JvcProjectorControl_SwitchInput(integer $InstanzID, integer $input);
+OpenSprinkler_RunProgram(integer $InstanzID, string $programName);
 ```
-Schaltet den Projektor mit der InstanzID $InstanzID auf einen bestimmten Eingang.
-Der Befehl kann nur ausgeführt werden, wenn der Projektor an ist (PowerStatus = "PoweredOn").
-
-```php
-JvcProjectorControl_SetLampPower(integer $InstanzID, bool $high);
-```
-Schaltet den Lampenmodus des Projektors mit der InstanzID $InstanzID auf Normal ($high = False) oder Hoch ($high = True)
-Der Befehl kann nur ausgeführt werden, wenn der Projektor an ist (PowerStatus = "PoweredOn").
-
-### 7. Anhang
-
-__Quellen__
-
-- [JVC D-ILA® Projector Remote Control Guide](http://support.jvc.com/consumer/support/documents/DILAremoteControlGuide.pdf)
+TBD

@@ -16,7 +16,7 @@ function GetJsonProperty($jsonData, string $propertyName, &$propertyValue, $defa
     return false;
 }
 
-function GetSprinklerOptionFromArray(array $options, int $sprinklerIndex, bool &$result, bool $negate = false) : bool
+function GetSprinklerOptionFromArray(array $options, int $sprinklerIndex, &$result, bool $negate = false) : bool
 {
     $byteIndex = (int)($sprinklerIndex / 8);
 

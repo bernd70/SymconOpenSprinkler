@@ -1,0 +1,14 @@
+{
+    "translations": {
+        "de": {
+            "Category for new Sprinkler stations": "Kategorie für neue Bewässerungsstationen",
+            "Enabled": "Aktiv",
+            "Number of Boards": "Anzahl an Boards",
+            "Sensor 1 active": "Sensor 1 aktiv",
+            "Sensor 2 active": "Sensor 2 aktiv",
+            "Rain Delay":" Regenverzögerung",
+            "Not active": "Nicht aktiv",
+            "Until %s": "Bis %s"
+        }
+    }
+}

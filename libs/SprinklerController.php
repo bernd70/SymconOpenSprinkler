@@ -2,21 +2,23 @@
 
 declare(strict_types=1);
 
+require_once "SprinklerControllerConfig.php";
 require_once "SprinklerHelper.php";
 require_once "SprinklerStation.php";
 require_once "SprinklerProgram.php";
 
 class SprinklerController
 {
-    var $stations = array();
-    var $programs = array();
+    private $SprinklerControllerConfig;
+    private $stations = [];
+    private $programs = [];
 
-    var $host;
-    var $passwordHash = "";
-    var $retries = 3;
+    private $host;
+    private $passwordHash = "";
+    private $retries = 3;
 
-    var $logCallback;
-    var $logLevel = 0;
+    private $logCallback;
+    private $logLevel = 0;
 
     const LOGLEVEL_STANDARD = 5;
     const LOGLEVEL_DEBUG = 9;
@@ -27,12 +29,10 @@ class SprinklerController
     const LOG_INFO = 3;
     const LOG_DEBUG = 9;
 
-    var $DeviceTime;
-    var $NumberOfBoards = 0;
-    var $OperationEnable = false;
-    var $Sensor1Active = false;
-    var $Sensor2Active = false;
-    var $RainDelay = 0;
+    function __construct()
+    {
+        $this->SprinklerControllerConfig = new SprinklerControllerConfig();
+    }
 
     public function Init($host, $password, $retries = 3)
     {
@@ -59,6 +59,12 @@ class SprinklerController
             return false;
         }
 
+        if (!property_exists($jsonData->settings, "ps"))
+        {
+            $error = "Section [settings/ps] missing from json";
+            return false;
+        }
+
         if (!property_exists($jsonData, "stations"))
         {
             $error = "Section [stations] missing from json";
@@ -77,10 +83,10 @@ class SprinklerController
             return false;
         }
 
-        if (!$this->InitSettingsFromJson($jsonData->settings, $error))
+        if (!$this->InitConfigFromJson($jsonData->settings, $error))
             return false;
 
-        if (!$this->InitStationsFromJson($jsonData->stations, $jsonData->status, $error))
+        if (!$this->InitStationsFromJson($jsonData->stations, $jsonData->status, $jsonData->settings->ps, $error))
             return false;
 
         if (!$this->InitProgramsFromJson($jsonData->programs, $error))
@@ -91,12 +97,43 @@ class SprinklerController
 
     public function EnableStation(int $stationIndex, bool $enable, &$error) : bool
     {
-        return $this->ExecuteCommand("cs", "d$stationIndex=$enable", $jsonData, $error);
+        return $this->ExecuteCommand("cs", "d$stationIndex=" . intval($enable), $jsonData, $error);
     }
 
-    public function RunStation(int $stationIndex, bool $enable, int $duration, &$error) : bool
+    public function SwitchStation(int $stationIndex, bool $enable, int $duration, &$error) : bool
     {
-        return $this->ExecuteCommand("cm", "sid=$stationIndex&en=$enable&t=$duration", $jsonData, $error);
+        return $this->ExecuteCommand("cm", "sid=$stationIndex&en=" . intval($enable) . "&t=$duration", $jsonData, $error);
+    }
+
+    public function RunProgram(string $programName, bool $useWeather, &$error) : bool
+    {
+        $programIndex = $this->FindProgram($programName);
+        if ($programIndex == -1)
+        {
+            $error = "Program [$programName] not found";
+            return false;
+        }
+
+        return $this->ExecuteCommand("mp", "pid=$programIndex&uwt=" . intval($useWeather), $jsonData, $error);
+    }
+
+    public function StopAllStations(&$error) : bool
+    {
+        $success = true;
+
+        foreach ($this->stations as $station)
+        {
+            if ($station->Active || $station->ScheduledTime != 0)
+            {
+                if (!$this->SwitchStation($station->Index, false, 0, $error))
+                {
+                    $this->Log(self::LOG_ERROR, __FUNCTION__, "Unable to switch off station $station->Index: $error");
+                    $success = false;
+                }
+            }
+        }
+
+        return $success;
     }
 
     public function ExecuteCustomCommand(string $cmd, string $params, &$jsonData, &$error) : bool
@@ -115,15 +152,15 @@ class SprinklerController
         $url = "http://$this->host/$cmd?pw=$this->passwordHash";
         if ($params != "")
             $url .= "&" . $params;
-    
+
         $this->Log(self::LOG_DEBUG, __FUNCTION__, "Url=$url");
-        
+
         $attempt = 1;
 
         while ($attempt <= $this->retries)
         {
             $request = curl_init($url);
-            
+
             curl_setopt($request, CURLOPT_USERAGENT, "SymconOpenSprinkler");
             curl_setopt($request, CURLOPT_CONNECTTIMEOUT, 5);
             curl_setopt($request, CURLOPT_TIMEOUT, 5);
@@ -134,9 +171,9 @@ class SprinklerController
             $status = curl_getinfo($request, CURLINFO_HTTP_CODE);
 
             $this->Log(self::LOG_DEBUG, __FUNCTION__, "Attempt $attempt: Result=$result, Status=$status");
-            
+
             curl_close($request);
-            
+
             if ($result !== false && $status == 200 /* HTTP_OK */)
                 break;
 
@@ -157,66 +194,66 @@ class SprinklerController
 
             return false;
         }
-    
+
         $jsonData = json_decode($result);
-    
+
         if (property_exists($jsonData, "result"))
         {
             switch ($jsonData->result)
             {
                 case 1:
                     return true;
-    
+
                 case 2:
                     $error = "Unauthorized";
                     return false;
-    
+
                 case 3:
                     $error ="Mismatch";
                     return false;
-    
+
                 case 16:
                     $error = "Data Missing";
                     return false;
-                    
-                case 17: 
+
+                case 17:
                     $error = "Out of Range";
                     return false;
-                    
+
                 case 18:
                     $error = "Data Format Error";
                     return false;
-                    
+
                 case 19:
                     $error = "RF code error";
                     return false;
-                    
+
                 case 32:
                     $error = "Page Not Found";
                     return false;
-                    
-                case 48: 
+
+                case 48:
                     $error = "Not permitted";
                     return false;
             }
         }
-    
-        return true;
-    }    
-
-    private function InitSettingsFromJson($jsonData, &$error) : bool
-    {
-        GetJsonProperty($jsonData, "devt", $this->DeviceTime, 0);
-        GetJsonProperty($jsonData, "nbrd", $this->NumberOfBoards, 1);
-        GetJsonProperty($jsonData, "en", $this->OperationEnable, false);
-        GetJsonProperty($jsonData, "sn1", $this->Sensor1Active, false);
-        GetJsonProperty($jsonData, "sn2", $this->Sensor2Active, false);
-        GetJsonProperty($jsonData, "rdst", $this->RainDelay, false);
 
         return true;
     }
 
-    private function InitStationsFromJson($jsonDataStations, $jsonDataStatus, &$error) : bool
+    private function InitConfigFromJson($jsonData, &$error) : bool
+    {
+        GetJsonProperty($jsonData, "devt", $this->SprinklerControllerConfig->DeviceTime, 0);
+        GetJsonProperty($jsonData, "nbrd", $this->SprinklerControllerConfig->NumberOfBoards, 1);
+        GetJsonProperty($jsonData, "en", $this->SprinklerControllerConfig->OperationEnable, false);
+        GetJsonProperty($jsonData, "sn1", $this->SprinklerControllerConfig->Sensor1Active, false);
+        GetJsonProperty($jsonData, "sn2", $this->SprinklerControllerConfig->Sensor2Active, false);
+        GetJsonProperty($jsonData, "rdst", $this->SprinklerControllerConfig->RainDelay, false);
+
+        return true;
+    }
+
+    private function InitStationsFromJson($jsonDataStations, $jsonDataStatus, $jsonDataProgramStatus, &$error) : bool
     {
         unset($this->stations);
         $this->stations = array();
@@ -264,22 +301,28 @@ class SprinklerController
         {
             $error = "Section [stations/stn_seq] missing from json";
             return false;
-        }                                
+        }
 
         foreach ($jsonDataStations->snames as $key => $stationName)
         {
-            $station = new SprinklerStation();
+            GetSprinklerOptionFromArray($jsonDataDisabled, $key, $enabled, true);
 
-            $station->Index = $key;
-            $station->Name = $stationName;
-            
-            GetSprinklerOptionFromArray($jsonDataDisabled, $key, $station->Enabled, true);
-            GetSprinklerOptionFromArray($jsonDataIgnoreRain, $key, $station->WeatherAdjusted, true);
-            GetSprinklerOptionFromArray($jsonDataIgnoreSensor1, $key, $optionValue, true);
-            GetSprinklerOptionFromArray($jsonDataIgnoreSensor2, $key, $optionValue, true);
-            GetSprinklerOptionFromArray($jsonDataSerialized, $key, $station->Serialized);
+            $active = $key < count($jsonDataStatus->sn) ? boolval($jsonDataStatus->sn[$key]) : false;
 
-            $station->Active = $key < count($jsonDataStatus->sn) ? $jsonDataStatus->sn[$key] : false;
+            $station = new SprinklerStation($key, $stationName, $enabled, $active);
+
+            GetSprinklerOptionFromArray($jsonDataIgnoreRain, $key, $ignoreRain);
+            GetSprinklerOptionFromArray($jsonDataIgnoreSensor1, $key, $ignoreSensor1);
+            GetSprinklerOptionFromArray($jsonDataIgnoreSensor2, $key, $ignoreSensor2);
+            GetSprinklerOptionFromArray($jsonDataSerialized, $key, $serialized);
+
+            $station->SetOptions(!$ignoreRain, !$ignoreSensor1, !$ignoreSensor2, $serialized);
+
+            $schedule = $jsonDataProgramStatus[$key];
+            if ($schedule[0] != 0)
+            {
+                $station->SetScheduled(true, $schedule[1], $schedule[2]);
+            }
 
             array_push($this->stations, $station);
         }
@@ -296,7 +339,7 @@ class SprinklerController
         {
             $error = "Section [programs/pd] missing from json";
             return false;
-        }        
+        }
 
         foreach ($jsonDataPrograms->pd as $key => $programData)
         {
@@ -320,28 +363,54 @@ class SprinklerController
         return $this->stations[$index];
     }
 
-    public function GetStationsAsJson()
+    public function GetStations()
     {
-        $sprinkler = [];
+        return $this->stations;
+    }
 
-        foreach ($this->stations as $station)
-            $sprinkler[] = $station->GetAsJson();
+    public function GetProgramCount() : int
+    {
+        return count($this->programs);
+    }
 
-        return $sprinkler;
+    public function GetProgram(int $index) : SprinklerProgram
+    {
+        return $this->programs[$index];
+    }
+
+    public function FindProgram(string $programName) : int
+    {
+        foreach ($this->programs as $program)
+        {
+            if (strcasecmp($program->Name, $programName) == 0)
+            return $program->Index;
+        }
+
+        return -1;
+    }
+
+    public function GetConfigAsJson(bool $includeDeviceTime = false)
+    {
+        $config = $this->SprinklerControllerConfig;
+
+        if (!$includeDeviceTime)
+            unset($config->DeviceTime);
+
+        return json_encode($config);
     }
 
     // public function UpdateSprinklerOptionInArray(int $sprinklerIndex, bool $enableOption, array &$newJsonDataDisabled) : bool
     // {
     //     $byteIndex = (int)($sprinklerIndex / 8);
-    
+
     //     if ($byteIndex >= count($options))
     //         return false;
-    
+
     //     if ($enableOption)
     //         $options[$byteIndex] = $options[$byteIndex] | pow(2, $sprinklerIndex % 8);
     //     else
     //         $options[$byteIndex] = $options[$byteIndex] & 0xffffffff - pow(2, $sprinklerIndex % 8);
-    
+
     //     return true;
     // }
 
@@ -353,14 +422,14 @@ class SprinklerController
 
     public function Dump()
     {
-        print("Device Time: " . date("j.n.Y, H:i:s", $this->DeviceTime) . "\n");
-        print("Number of Boards: " . $this->NumberOfBoards . "\n");
-        print("Operation Enable: " . ($this->OperationEnable ? "Yes" : "No") . "\n");
+        print("Device Time: " . $this->SprinklerControllerConfig->GetLocalDeviceTimeAsString() . "\n");
+        print("Number of Boards: " . $this->SprinklerControllerConfig->NumberOfBoards . "\n");
+        print("Operation Enable: " . ($this->SprinklerControllerConfig->OperationEnable ? "Yes" : "No") . "\n");
 
-        print("Sensor 1: " . ($this->Sensor1Active ? "Active" : "Not active") . "\n");
-        print("Sensor 2: " . ($this->Sensor2Active ? "Active" : "Not active") . "\n");
-        
-        print("Rain delay: " . ($this->RainDelay == 0 ? "Not active" : "Until " . date("j.n.Y, H:i:s", $this->RainDelay)) . "\n");    
+        print("Sensor 1: " . ($this->SprinklerControllerConfig->Sensor1Active ? "Active" : "Not active") . "\n");
+        print("Sensor 2: " . ($this->SprinklerControllerConfig->Sensor2Active ? "Active" : "Not active") . "\n");
+
+        print("Rain delay: " . $this->SprinklerControllerConfig->GetLocalRainDelayTimeAsString() . "\n");
 
         print("Stations:\n");
         foreach ($this->stations as $station)

@@ -16,14 +16,26 @@ class OpenSprinklerIO extends BaseIPSModule
 
     // Common parameters
     const CMDPARAM_Index = "Index";
+    const CMDPARAM_Name = "Name";
     const CMDPARAM_Enable = "Enable";
     const CMDPARAM_Duration = "Duration"; // seconds
-    
+    const CMDPARAM_UseWeather = "UseWeather";
+
     // Commands
     const CMD_GetStations = "GetStations";
-    
+
     const CMD_EnableStation = "EnableStation";
-    const CMD_RunStation = "RunStation";
+    const CMD_SwitchStation = "SwitchStation";
+    const CMD_StopAllStations = "StopAllStations";
+    const CMD_RunProgram = "RunProgram";
+
+    const CMD_StationStatus = "StationStatus";
+    const CMD_ControllerConfig = "ControllerConfig";
+
+    // SendDataToParent Args
+    const MSGARG_Destination = "Destination";
+    const MSGARG_Command = "Command";
+    const MSGARG_Data = "Data";
 
     public function Create()
     {
@@ -34,7 +46,34 @@ class OpenSprinklerIO extends BaseIPSModule
         $this->RegisterPropertyString(self::PROPERTY_Password, "");
         $this->RegisterPropertyInteger(self::PROPERTY_UpdateInterval, 10);
 
-        $this->RegisterTimer('Update', 0, 'OpenSprinkler_UpdateStatus($_IPS[\'TARGET\'], 0);');        
+        $this->RegisterTimer('Update', 0, 'OpenSprinkler_UpdateStatus($_IPS[\'TARGET\'], 0);');
+    }
+
+    private function UpdateVariableProfiles(SprinklerController $sprinklerController)
+    {
+        if (IPS_VariableProfileExists("OpenSprinkler.Station"))
+            IPS_DeleteVariableProfile("OpenSprinkler.Station");
+
+        IPS_CreateVariableProfile("OpenSprinkler.Station", 1);
+
+        for ($stationIndex = 0; $stationIndex < $sprinklerController->GetStationCount(); $stationIndex++)
+        {
+            $station = $sprinklerController->GetStation($stationIndex);
+
+            IPS_SetVariableProfileAssociation("OpenSprinkler.Station", $station->Index, $station->Name, "", -1);
+        }
+
+        if (IPS_VariableProfileExists("OpenSprinkler.Program"))
+            IPS_DeleteVariableProfile("OpenSprinkler.Program");
+
+        IPS_CreateVariableProfile("OpenSprinkler.Program", 1);
+
+        for ($programIndex = 0; $programIndex < $sprinklerController->GetProgramCount(); $programIndex++)
+        {
+            $program = $sprinklerController->GetProgram($programIndex);
+
+            IPS_SetVariableProfileAssociation("OpenSprinkler.Program", $program->Index, $program->Name, "", -1);
+        }
     }
 
     public function ApplyChanges()
@@ -47,7 +86,7 @@ class OpenSprinklerIO extends BaseIPSModule
             $this->SetStatus(IS_ACTIVE);
 
             // Start UpdateStatus Timer
-            $this->SetTimerInterval('Update', $this->ReadPropertyInteger(self::PROPERTY_UpdateInterval) * 1000);            
+            $this->SetTimerInterval('Update', $this->ReadPropertyInteger(self::PROPERTY_UpdateInterval) * 1000);
         }
         else
         {
@@ -65,15 +104,53 @@ class OpenSprinklerIO extends BaseIPSModule
         $sprinklerController = $this->InitController();
         if ($sprinklerController == false)
             return false;
-        
+
         if (!$sprinklerController->Read($error))
         {
             $this->LogMessage("UpdateStatus Error: " . $error, KL_ERROR);
             return false;
         }
 
-        // Send data to Sprinkler Stations
-        $this->SendData(json_encode($sprinklerController->GetStationsAsJson()));
+        $this->UpdateVariableProfiles($sprinklerController);
+
+        $config = $sprinklerController->GetConfigAsJson();
+        $configMD5 = MD5($config);
+        $this->SendDebug(__FUNCTION__, "configMD5=$configMD5, storedConfigMD5=" . $this->GetBuffer("Config"), 0);
+
+        if ($this->GetBuffer("Config") !== $configMD5)
+        {
+            $sendData = [
+                'DataID' => OpenSprinklerIO::MODULE_GUID_RX,
+                OpenSprinklerIO::MSGARG_Destination => OpenSprinklerController::class,
+                OpenSprinklerIO::MSGARG_Command => OpenSprinklerIO::CMD_ControllerConfig,
+                OpenSprinklerIO::MSGARG_Data => $config
+            ];
+
+            // Send data to Sprinkler Controller and Stations
+            $this->SendData(json_encode($sendData));
+
+            $this->SetBuffer("Config", $configMD5);
+        }
+
+        $stations = $sprinklerController->GetStations();
+        $stationsJson = json_encode($stations);
+        $stationStatusMD5 = MD5($stationsJson);
+        $this->SendDebug(__FUNCTION__, "stationStatusMD5=$stationStatusMD5, storedStationStatusMD5=" . $this->GetBuffer("StationStatus"), 0);
+
+        if ($this->GetBuffer("StationStatus") !== $stationStatusMD5)
+        {
+            $sendData = [
+                'DataID' => OpenSprinklerIO::MODULE_GUID_RX,
+                OpenSprinklerIO::MSGARG_Destination => OpenSprinklerStation::class,
+                OpenSprinklerIO::MSGARG_Command => OpenSprinklerIO::CMD_StationStatus,
+                OpenSprinklerIO::MSGARG_Data => $stationsJson
+            ];
+
+            // Send data to Sprinkler Controller and Stations
+            $this->SendData(json_encode($sendData));
+
+            $this->SetBuffer("StationStatus", $stationStatusMD5);
+        }
 
         return true;
     }
@@ -84,7 +161,7 @@ class OpenSprinklerIO extends BaseIPSModule
 
         $sprinklerController->Init($this->ReadPropertyString(self::PROPERTY_Host), $this->ReadPropertyString(self::PROPERTY_Password));
         $sprinklerController->SetLogCallback(Closure::fromCallable([$this, "LogCallback"]), SprinklerController::LOGLEVEL_DEBUG);
-        
+
         if (!$sprinklerController->Read($error))
         {
             $this->LogMessage("UpdateStatus Error: " . $error, KL_ERROR);
@@ -115,7 +192,7 @@ class OpenSprinklerIO extends BaseIPSModule
         $ret = '';
         $command = $jdata['Command'];
 
-        if (isset($command)) 
+        if (isset($command))
         {
             switch ($command)
             {
@@ -127,18 +204,28 @@ class OpenSprinklerIO extends BaseIPSModule
                     $result = $this->EnableStation($jdata[self::CMDPARAM_Index], $jdata[self::CMDPARAM_Enable]);
                     break;
 
-                case self::CMD_RunStation:
+                case self::CMD_SwitchStation:
                     if (!$this->CheckProperties($jdata, $error, self::CMDPARAM_Index, self::CMDPARAM_Enable, self::CMDPARAM_Duration))
                         return false;
-                    $result = $this->RunStation($jdata[self::CMDPARAM_Index], $jdata[self::CMDPARAM_Enable], $jdata[self::CMDPARAM_Duration]);
+                    $result = $this->SwitchStation($jdata[self::CMDPARAM_Index], $jdata[self::CMDPARAM_Enable], $jdata[self::CMDPARAM_Duration]);
                     break;
-    
+
+                case self::CMD_RunProgram:
+                    if (!$this->CheckProperties($jdata, $error, self::CMDPARAM_Name, self::CMDPARAM_UseWeather))
+                        return false;
+                    $result = $this->RunProgram($jdata[self::CMDPARAM_Name], $jdata[self::CMDPARAM_UseWeather]);
+                    break;
+
+                case self::CMD_StopAllStations:
+                    $result = $this->StopAllStations();
+                    break;
+
                 default:
                     $this->SendDebug(__FUNCTION__, "Unknown Command: $command", 0);
                     break;
             }
-        } 
-        else 
+        }
+        else
         {
             $this->SendDebug(__FUNCTION__, 'Unknown Message Structure', 0);
         }
@@ -157,11 +244,11 @@ class OpenSprinklerIO extends BaseIPSModule
         return ($host !== false && $host != "" && $password !== false && $password != "");
     }
 
-    private function CheckProperties($jsonData, string &$error, ...$propertyNames) : bool
+    private function CheckProperties(array $properties, &$error, ...$propertyNames) : bool
     {
         foreach($propertyNames as $propertyName)
         {
-            if (!property_exists($jsonData, $propertyName))
+            if (!array_key_exists($propertyName, $properties))
             {
                 $error = "Parameter $propertyName missing";
                 return false;
@@ -201,28 +288,55 @@ class OpenSprinklerIO extends BaseIPSModule
         if ($sprinklerController == false)
             return false;
 
-        $stations = $sprinklerController->stations;
+        $stations = $sprinklerController->GetStations();
 
-        return true;        
+        return true;
     }
 
     private function EnableStation(int $stationIndex, bool $enable) : bool
     {
+        $this->LogMessage("EnableStation $stationIndex, enable=$enable", KL_NOTIFY);
+
         $sprinklerController = $this->InitController();
+
         if ($sprinklerController == false)
             return false;
 
         return $sprinklerController->EnableStation($stationIndex, $enable, $error);
     }
 
-    private function RunStation(int $stationIndex, bool $enable, int $duration) : bool
+    private function SwitchStation(int $stationIndex, bool $enable, int $duration) : bool
     {
+        $this->LogMessage("SwitchStation $stationIndex, enable=$enable, duration=$duration", KL_NOTIFY);
+
         $sprinklerController = $this->InitController();
         if ($sprinklerController == false)
             return false;
 
-        return $sprinklerController->RunStation($stationIndex, $enable, $duration, $error);
-    }    
+        return $sprinklerController->SwitchStation($stationIndex, $enable, $duration, $error);
+    }
+
+    private function RunProgram(string $programName, bool $useWeather) : bool
+    {
+        $this->LogMessage("RunProgram [$programName], useWeather=$useWeather", KL_NOTIFY);
+
+        $sprinklerController = $this->InitController();
+        if ($sprinklerController == false)
+            return false;
+
+        return $sprinklerController->RunProgram($programName, $useWeather, $error);
+    }
+
+    private function StopAllStations() : bool
+    {
+        $this->LogMessage("StopAllStations", KL_NOTIFY);
+
+        $sprinklerController = $this->InitController();
+        if ($sprinklerController == false)
+            return false;
+
+        return $sprinklerController->StopAllStations($error);
+    }
 }
 
 ?>

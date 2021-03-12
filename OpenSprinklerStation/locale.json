@@ -1,10 +1,20 @@
 {
     "translations": {
         "de": {
-            "Station Configuration (Do not edit!)": "Stationskonfiguration (Nicht ändern!)",
-            "Station Index": "Stationsindex",
+            "Station Configuration": "Stationskonfiguration",
+            "Station Index: %s": "Stationsindex: %s",
             "Polling Interval": "Abfrageintervall",
-            "Activate exteded logging": "Erweitertes Logging aktivieren"
+            "Activate exteded logging": "Erweitertes Logging aktivieren",
+            "Enabled": "Aktiviert",
+            "Unknown": "Unbekannt",
+            "Deactivated": "Deaktiviert",
+            "Idle": "Leerlauf",
+            "Running": "Aktiv",
+            "Scheduled": "Geplant",
+            "WeatherAdjusted": "Wettergesteuert",
+            "Sensor 1 Enabled": "Sensor 1 aktiv",
+            "Sensor 2 Enabled": "Sensor 2 aktiv",
+            "Serialized": "Nacheinander"
         }
     }
 }

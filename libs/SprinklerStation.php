@@ -4,42 +4,55 @@ declare(strict_types=1);
 
 class SprinklerStation
 {
-    const KEY_Index = "Index";
-    const KEY_Active = "Active";
-    const KEY_Name = "Name";
-    const KEY_Enabled = "Enabled";
-    const KEY_WeatherAdjusted = "WeatherAdjusted";
-    const KEY_Sensor1Enabled = "Sensor1Enabled";
-    const KEY_Sensor2Enabled = "Sensor2Enabled";
-    const KEY_Serialized = "Serialized";
-
     var $Index = -1;
 
     var $Active = false;
 
     var $Name = "";
     var $Enabled = false;
+    var $ScheduledTime = 0;
+    var $ScheduledDuration = 0;
     var $WeatherAdjusted = false;
     var $Sensor1Enabled = false;
     var $Sensor2Enabled = false;
     var $Serialized = false;
 
-    public function GetAsJson()
+    function __construct(int $index, string $name, bool $enabled, bool $active)
     {
-        $jsonData = [];
+        $this->Index = $index;
+        $this->Name = $name;
+        $this->Enabled = $enabled;
+        $this->Active = $active;
+    }
 
-        $jsonData[self::KEY_Index] = $this->Index;
+    public function InitFromJson($jsonString)
+    {
+        $data = json_decode($jsonString, true);
 
-        $jsonData[self::KEY_Active] = $this->Active;
+        foreach ($data AS $key => $value)
+            $this->{$key} = $value;
+    }
 
-        $jsonData[self::KEY_Name] = $this->Name;
-        $jsonData[self::KEY_Enabled] = $this->Enabled;
-        $jsonData[self::KEY_WeatherAdjusted] = $this->WeatherAdjusted;
-        $jsonData[self::KEY_Sensor1Enabled] = $this->Sensor1Enabled;
-        $jsonData[self::KEY_Sensor2Enabled] = $this->Sensor2Enabled;
-        $jsonData[self::KEY_Serialized] = $this->Serialized;
+    public function SetOptions(bool $weatherAdjusted, bool $sensor1Enabled, bool $sensor2Enabled, bool $serialized)
+    {
+        $this->WeatherAdjusted = $weatherAdjusted;
+        $this->Sensor1Enabled = $sensor1Enabled;
+        $this->Sensor2Enabled = $sensor2Enabled;
+        $this->Serialized = $serialized;
+    }
 
-        return $jsonData;
+    public function SetScheduled(bool $scheduled, int $duration, int $time)
+    {
+        if ($scheduled)
+        {
+            $this->ScheduledTime = $time;
+            $this->ScheduledDuration = $duration;
+        }
+        else
+        {
+            $this->ScheduledTime = 0;
+            $this->ScheduledDuration = 0;
+        }
     }
 
     public function Dump()
@@ -52,5 +65,4 @@ class SprinklerStation
         printf("\n");
     }
 }
-
 
