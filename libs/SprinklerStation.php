@@ -33,7 +33,7 @@ class SprinklerStation
             $this->{$key} = $value;
     }
 
-    public function SetOptions(bool $weatherAdjusted, bool $sensor1Enabled, bool $sensor2Enabled, bool $serialized)
+    public function SetOptions(bool $weatherAdjusted, $sensor1Enabled, $sensor2Enabled, bool $serialized)
     {
         $this->WeatherAdjusted = $weatherAdjusted;
         $this->Sensor1Enabled = $sensor1Enabled;

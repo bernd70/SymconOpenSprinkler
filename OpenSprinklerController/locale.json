@@ -1,14 +1,29 @@
 {
     "translations": {
         "de": {
+            "Device time": "Gerätezeit",
+            "Number of boards": "Anzahl Boards",
             "Category for new Sprinkler stations": "Kategorie für neue Bewässerungsstationen",
             "Enabled": "Aktiv",
+            "Yes": "Ja",
+            "No": "Nein",
             "Number of Boards": "Anzahl an Boards",
-            "Sensor 1 active": "Sensor 1 aktiv",
-            "Sensor 2 active": "Sensor 2 aktiv",
             "Rain Delay":" Regenverzögerung",
             "Not active": "Nicht aktiv",
-            "Until %s": "Bis %s"
+            "Until %s": "Bis %s",
+            "Sensor 1": "Sensor 1",
+            "Sensor 2": "Sensor 2",
+            "Inactive": "Nicht aktiv",
+            "Rain": "Regen",
+            "Flow": "Durchfluss",
+            "Soil": "Bodenfeuchte",
+            "Programm": "Programm",
+            "Weather method": "Wettermethode",
+            "Waterlevel": "Wassermenge",
+            "Manual control": "Manuelle Steuerung",
+            "Zimmerman": "Zimmerman",
+            "Auto Delay on Rain": "Automatische Verzögerung bei Regen",
+            "Evapotranspiration": "Evapotranspiration"
         }
     }
 }

@@ -13,10 +13,11 @@ class OpenSprinklerController extends BaseIPSModule
     const PROPERTY_ImportCategory = "ImportCategory";
 
     const VARIABLE_Enabled = "Enabled";
-    const VARIABLE_NumberOfBoards = "NumberOfBoards";
+    const VARIABLE_WeatherMethod = "WeatherMethod";
+    const VARIABLE_Waterlevel = "Waterlevel";
     const VARIABLE_RainDelay = "RainDelay";
-    const VARIABLE_Sensor1Active = "Sensor1Active";
-    const VARIABLE_Sensor2Active = "Sensor2Active";
+    const VARIABLE_Sensor1 = "Sensor1";
+    const VARIABLE_Sensor2 = "Sensor2";
 
     public function Create()
     {
@@ -35,6 +36,10 @@ class OpenSprinklerController extends BaseIPSModule
     {
         // Diese Zeile nicht löschen
         parent::ApplyChanges();
+
+        $receiveDataFilter = ".*\"Destination\":\"" . OpenSprinklerStation::class . "\".*";
+        $this->SendDebug(__FUNCTION__, "ReceiveDataFilter=" . $receiveDataFilter, 0);
+        $this->SetReceiveDataFilter($receiveDataFilter);
 
         $refs = $this->GetReferenceList();
         foreach ($refs as $ref)
@@ -60,25 +65,67 @@ class OpenSprinklerController extends BaseIPSModule
 
     private function RegisterVariableProfiles()
     {
-        if (!IPS_VariableProfileExists("OpenSprinkler.Station"))
-            IPS_CreateVariableProfile("OpenSprinkler.Station", 1);
+        if (!IPS_VariableProfileExists("OpenSprinkler.SensorType"))
+        {
+            IPS_CreateVariableProfile("OpenSprinkler.SensorType", 1);
 
-        if (!IPS_VariableProfileExists("OpenSprinkler.Program"))
-            IPS_CreateVariableProfile("OpenSprinkler.Program", 1);
+            IPS_SetVariableProfileAssociation("OpenSprinkler.SensorType", SprinklerControllerConfig::SENSORTYPE_Inactive, $this->Translate("Inactive"), "", -1);
+            IPS_SetVariableProfileAssociation("OpenSprinkler.SensorType", SprinklerControllerConfig::SENSORTYPE_Rain, $this->Translate("Rain"), "", -1);
+            IPS_SetVariableProfileAssociation("OpenSprinkler.SensorType", SprinklerControllerConfig::SENSORTYPE_Flow, $this->Translate("Flow"), "", -1);
+            IPS_SetVariableProfileAssociation("OpenSprinkler.SensorType", SprinklerControllerConfig::SENSORTYPE_Soil, $this->Translate("Soil"), "", -1);
+            IPS_SetVariableProfileAssociation("OpenSprinkler.SensorType", SprinklerControllerConfig::SENSORTYPE_Program, $this->Translate("Program"), "", -1);
+        }
+
+        if (!IPS_VariableProfileExists("OpenSprinkler.WeatherMethod"))
+        {
+            IPS_CreateVariableProfile("OpenSprinkler.WeatherMethod", 1);
+
+            IPS_SetVariableProfileAssociation("OpenSprinkler.WeatherMethod", SprinklerControllerConfig::WEATHERMETHOD_Manual, $this->Translate("Manual control"), "", -1);
+            IPS_SetVariableProfileAssociation("OpenSprinkler.WeatherMethod", SprinklerControllerConfig::WEATHERMETHOD_Zimmerman, $this->Translate("Zimmerman"), "", -1);
+            IPS_SetVariableProfileAssociation("OpenSprinkler.WeatherMethod", SprinklerControllerConfig::WEATHERMETHOD_AutoDelayOnRain, $this->Translate("Auto Delay on Rain"), "", -1);
+            IPS_SetVariableProfileAssociation("OpenSprinkler.WeatherMethod", SprinklerControllerConfig::WEATHERMETHOD_Evapotranspiration, $this->Translate("Evapotranspiration"), "", -1);
+        }
+
+        // if (!IPS_VariableProfileExists("OpenSprinkler.Station"))
+        //     IPS_CreateVariableProfile("OpenSprinkler.Station", 1);
+
+        // if (!IPS_VariableProfileExists("OpenSprinkler.Program"))
+        //     IPS_CreateVariableProfile("OpenSprinkler.Program", 1);
     }
 
     private function RegisterVariables()
     {
         $this->RegisterVariableBoolean(self::VARIABLE_Enabled, $this->Translate("Enabled"), "~Switch", 1);
-        $this->RegisterVariableInteger(self::VARIABLE_NumberOfBoards, $this->Translate("Number of Boards"), "", 2);
-        $this->RegisterVariableBoolean(self::VARIABLE_Sensor1Active, $this->Translate("Sensor 1 active"), "", 3);
-        $this->RegisterVariableBoolean(self::VARIABLE_Sensor2Active, $this->Translate("Sensor 2 active"), "", 4);
-        $this->RegisterVariableString(self::VARIABLE_RainDelay, $this->Translate("Rain Delay"), "", 5);
+        $this->RegisterVariableInteger(self::VARIABLE_Sensor1, $this->Translate("Sensor 1"), "OpenSprinkler.SensorType", 3);
+        $this->RegisterVariableInteger(self::VARIABLE_Sensor2, $this->Translate("Sensor 2"), "OpenSprinkler.SensorType", 4);
+        $this->RegisterVariableInteger(self::VARIABLE_WeatherMethod, $this->Translate("Weather method"), "OpenSprinkler.WeatherMethod", 5);
+        $this->RegisterVariableInteger(self::VARIABLE_Waterlevel, $this->Translate("Waterlevel"), "~Humidity", 6);
+        $this->RegisterVariableString(self::VARIABLE_RainDelay, $this->Translate("Rain Delay"), "", 7);
     }
 
     public function GetConfigurationForm()
     {
         $elements = [];
+
+        $config = $this->GetConfig();
+
+        $elements[] = [
+            "type" => "ExpansionPanel",
+            "caption" => "Controller Configuration",
+            "items" =>
+            [
+                [
+                    "type" => "Label",
+                    "name" => "DeviceTime",
+                    "caption" => $this->Translate("Device time") . ": " . $config->GetLocalDeviceTimeAsString()
+                ],
+                [
+                    "type" => "Label",
+                    "name" => "NumberOfBoards",
+                    "caption" => $this->Translate("Number of boards") . ": $config->NumberOfBoards"
+                ]
+            ]
+        ];
 
         $elements[] = [
             "name"  =>  "ImportCategory",
@@ -100,6 +147,7 @@ class OpenSprinklerController extends BaseIPSModule
                 $addValue = [
                     "Name"        => $station->Name,
                     "Index"       => $station->Index,
+                    "Enabled"     => $this->Translate($station->Enabled ? "Yes" : "No"),
                     "instanceID"  => $instanceId,
                     "create"      => [
                         "moduleID" => "{DE0EA757-F6F3-4CC7-3FD0-39622E94EB35}",
@@ -124,6 +172,7 @@ class OpenSprinklerController extends BaseIPSModule
             "sort"      => [ "column" => "Index", "direction" => "ascending" ],
             "columns"   => [
                 [ "name" => "Index", "caption" => "Index", "width" => "100px", "visible" => true ],
+                [ "name" => "Enabled", "caption" => "Enabled", "width" => "70px", "visible" => true ],
                 [ "name" => "Name", "caption" => "Name", "width" => "auto", "visible" => true ]
             ],
             "values"    => $formStations
@@ -142,13 +191,12 @@ class OpenSprinklerController extends BaseIPSModule
         // $this->SendDebug(__FUNCTION__, "data=" . $jsonString, 0);
 
         // Empfangene Daten vom IO Modul
-        $jsonData = json_decode($jsonString);
-        $jsonMsg = json_decode($jsonData->Buffer, true);
+        $jsonMsg = json_decode($jsonString);
 
-        if (array_key_exists(OpenSprinklerIO::MSGARG_Destination, $jsonMsg)
-            && $jsonMsg[OpenSprinklerIO::MSGARG_Destination] == self::class
-            && array_key_exists(OpenSprinklerIO::MSGARG_Command, $jsonMsg)
-            && array_key_exists(OpenSprinklerIO::MSGARG_Data, $jsonMsg))
+        if (property_exists($jsonMsg, OpenSprinklerIO::MSGARG_Destination)
+            && $jsonMsg->{OpenSprinklerIO::MSGARG_Destination} == self::class
+            && property_exists($jsonMsg, OpenSprinklerIO::MSGARG_Command)
+            && property_exists($jsonMsg, OpenSprinklerIO::MSGARG_Data))
         {
             $this->ProcessMsg($jsonMsg);
         }
@@ -158,26 +206,44 @@ class OpenSprinklerController extends BaseIPSModule
     {
         $this->SendDebug(__FUNCTION__, "data=" . print_r($msg, true), 0);
 
-        $command = $msg[OpenSprinklerIO::MSGARG_Command];
-
+        $command = $msg->{OpenSprinklerIO::MSGARG_Command};
 
         switch ($command)
         {
             case OpenSprinklerIO::CMD_ControllerConfig:
-                $sprinklerControllerConfig = new SprinklerControllerConfig();
-
-                $sprinklerControllerConfig->SetFromJson($msg[OpenSprinklerIO::MSGARG_Data]);
+                $sprinklerControllerConfig = new SprinklerControllerConfig($msg->{OpenSprinklerIO::MSGARG_Data});
 
                 SetValueBoolean($this->GetIDForIdent(self::VARIABLE_Enabled), $sprinklerControllerConfig->OperationEnable);
-                SetValueInteger($this->GetIDForIdent(self::VARIABLE_NumberOfBoards), $sprinklerControllerConfig->NumberOfBoards);
-                SetValueBoolean($this->GetIDForIdent(self::VARIABLE_Sensor1Active), $sprinklerControllerConfig->Sensor1Active);
-                SetValueBoolean($this->GetIDForIdent(self::VARIABLE_Sensor2Active), $sprinklerControllerConfig->Sensor2Active);
+                SetValueInteger($this->GetIDForIdent(self::VARIABLE_Sensor1), $sprinklerControllerConfig->Sensor1Type);
+                SetValueInteger($this->GetIDForIdent(self::VARIABLE_Sensor2), $sprinklerControllerConfig->Sensor2Type);
+                SetValueInteger($this->GetIDForIdent(self::VARIABLE_WeatherMethod), $sprinklerControllerConfig->WeatherMethod);
+                SetValueInteger($this->GetIDForIdent(self::VARIABLE_Waterlevel), $sprinklerControllerConfig->WaterLevel);
 
                 if ($sprinklerControllerConfig->RainDelay == 0)
                     SetValueString($this->GetIDForIdent(self::VARIABLE_RainDelay), $this->Translate("Not active"));
                 else
                     SetValueString($this->GetIDForIdent(self::VARIABLE_RainDelay), sprintf($this->Translate("Until %s"), $sprinklerControllerConfig->GetLocalRainDelayTimeAsString()));
+
+                break;
         }
+    }
+
+    private function GetConfig() : SprinklerControllerConfig
+    {
+        if ($this->HasActiveParent() == false)
+        {
+            $this->SendDebug(__FUNCTION__, 'has no active parent', 0);
+            $this->LogMessage('has no active parent instance', KL_WARNING);
+
+            return null;
+        }
+
+        $sendData = ['DataID' => OpenSprinklerIO::MODULE_GUID_RX, 'Command' => OpenSprinklerIO::CMD_GetControllerConfig];
+        $jsonConfig = $this->SendDataToParent(json_encode($sendData));
+
+        $this->SendDebug(__FUNCTION__, 'config=' . $jsonConfig, 0);
+
+        return new SprinklerControllerConfig(json_decode($jsonConfig));
     }
 
     private function GetStations()

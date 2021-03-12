@@ -22,6 +22,7 @@ class OpenSprinklerIO extends BaseIPSModule
     const CMDPARAM_UseWeather = "UseWeather";
 
     // Commands
+    const CMD_GetControllerConfig = "GetControllerConfig";
     const CMD_GetStations = "GetStations";
 
     const CMD_EnableStation = "EnableStation";
@@ -51,29 +52,29 @@ class OpenSprinklerIO extends BaseIPSModule
 
     private function UpdateVariableProfiles(SprinklerController $sprinklerController)
     {
-        if (IPS_VariableProfileExists("OpenSprinkler.Station"))
-            IPS_DeleteVariableProfile("OpenSprinkler.Station");
+        // if (IPS_VariableProfileExists("OpenSprinkler.Station"))
+        //     IPS_DeleteVariableProfile("OpenSprinkler.Station");
 
-        IPS_CreateVariableProfile("OpenSprinkler.Station", 1);
+        // IPS_CreateVariableProfile("OpenSprinkler.Station", 1);
 
-        for ($stationIndex = 0; $stationIndex < $sprinklerController->GetStationCount(); $stationIndex++)
-        {
-            $station = $sprinklerController->GetStation($stationIndex);
+        // for ($stationIndex = 0; $stationIndex < $sprinklerController->GetStationCount(); $stationIndex++)
+        // {
+        //     $station = $sprinklerController->GetStation($stationIndex);
 
-            IPS_SetVariableProfileAssociation("OpenSprinkler.Station", $station->Index, $station->Name, "", -1);
-        }
+        //     IPS_SetVariableProfileAssociation("OpenSprinkler.Station", $station->Index, $station->Name, "", -1);
+        // }
 
-        if (IPS_VariableProfileExists("OpenSprinkler.Program"))
-            IPS_DeleteVariableProfile("OpenSprinkler.Program");
+        // if (IPS_VariableProfileExists("OpenSprinkler.Program"))
+        //     IPS_DeleteVariableProfile("OpenSprinkler.Program");
 
-        IPS_CreateVariableProfile("OpenSprinkler.Program", 1);
+        // IPS_CreateVariableProfile("OpenSprinkler.Program", 1);
 
-        for ($programIndex = 0; $programIndex < $sprinklerController->GetProgramCount(); $programIndex++)
-        {
-            $program = $sprinklerController->GetProgram($programIndex);
+        // for ($programIndex = 0; $programIndex < $sprinklerController->GetProgramCount(); $programIndex++)
+        // {
+        //     $program = $sprinklerController->GetProgram($programIndex);
 
-            IPS_SetVariableProfileAssociation("OpenSprinkler.Program", $program->Index, $program->Name, "", -1);
-        }
+        //     IPS_SetVariableProfileAssociation("OpenSprinkler.Program", $program->Index, $program->Name, "", -1);
+        // }
     }
 
     public function ApplyChanges()
@@ -113,41 +114,22 @@ class OpenSprinklerIO extends BaseIPSModule
 
         $this->UpdateVariableProfiles($sprinklerController);
 
-        $config = $sprinklerController->GetConfigAsJson();
-        $configMD5 = MD5($config);
-        $this->SendDebug(__FUNCTION__, "configMD5=$configMD5, storedConfigMD5=" . $this->GetBuffer("Config"), 0);
+        $config = $sprinklerController->GetConfig(true);
+        $configMD5 = MD5(json_encode($config));
 
         if ($this->GetBuffer("Config") !== $configMD5)
         {
-            $sendData = [
-                'DataID' => OpenSprinklerIO::MODULE_GUID_RX,
-                OpenSprinklerIO::MSGARG_Destination => OpenSprinklerController::class,
-                OpenSprinklerIO::MSGARG_Command => OpenSprinklerIO::CMD_ControllerConfig,
-                OpenSprinklerIO::MSGARG_Data => $config
-            ];
-
-            // Send data to Sprinkler Controller and Stations
-            $this->SendData(json_encode($sendData));
+            $this->SendData(OpenSprinklerController::class, OpenSprinklerIO::CMD_ControllerConfig, $config);
 
             $this->SetBuffer("Config", $configMD5);
         }
 
         $stations = $sprinklerController->GetStations();
-        $stationsJson = json_encode($stations);
-        $stationStatusMD5 = MD5($stationsJson);
-        $this->SendDebug(__FUNCTION__, "stationStatusMD5=$stationStatusMD5, storedStationStatusMD5=" . $this->GetBuffer("StationStatus"), 0);
+        $stationStatusMD5 = MD5(json_encode($stations));
 
         if ($this->GetBuffer("StationStatus") !== $stationStatusMD5)
         {
-            $sendData = [
-                'DataID' => OpenSprinklerIO::MODULE_GUID_RX,
-                OpenSprinklerIO::MSGARG_Destination => OpenSprinklerStation::class,
-                OpenSprinklerIO::MSGARG_Command => OpenSprinklerIO::CMD_StationStatus,
-                OpenSprinklerIO::MSGARG_Data => $stationsJson
-            ];
-
-            // Send data to Sprinkler Controller and Stations
-            $this->SendData(json_encode($sendData));
+            $this->SendData(OpenSprinklerStation::class, OpenSprinklerIO::CMD_StationStatus,$stations);
 
             $this->SetBuffer("StationStatus", $stationStatusMD5);
         }
@@ -171,11 +153,18 @@ class OpenSprinklerIO extends BaseIPSModule
         return $sprinklerController;
     }
 
-    protected function SendData($buf)
+    protected function SendData(string $destination, string $command, $data)
     {
-        $data = ['DataID' => '{6B94F6BD-A4F6-87B3-A9D1-907A1D7C30EF}', 'Buffer' => $buf];
-        $this->SendDebug(__FUNCTION__, 'data=' . print_r($data, true), 0);
-        $this->SendDataToChildren(json_encode($data));
+        $sendData = [
+            'DataID' => '{6B94F6BD-A4F6-87B3-A9D1-907A1D7C30EF}',
+            OpenSprinklerIO::MSGARG_Destination => $destination,
+            OpenSprinklerIO::MSGARG_Command => $command,
+            OpenSprinklerIO::MSGARG_Data => $data
+        ];
+
+        $this->SendDebug(__FUNCTION__, 'data=' . print_r($sendData, true), 0);
+
+        $this->SendDataToChildren(json_encode($sendData));
     }
 
     public function ForwardData($data)
@@ -196,6 +185,10 @@ class OpenSprinklerIO extends BaseIPSModule
         {
             switch ($command)
             {
+                case self::CMD_GetControllerConfig:
+                    $result = $this->GetControllerConfig($ret);
+                    break;
+
                 case self::CMD_GetStations:
                     $result = $this->GetStations($ret);
                     break;
@@ -280,6 +273,17 @@ class OpenSprinklerIO extends BaseIPSModule
                 $this->SendDebug($function, $message, 0);
                 break;
         }
+    }
+
+    private function GetControllerConfig(&$config) : bool
+    {
+        $sprinklerController = $this->InitController();
+        if ($sprinklerController == false)
+            return false;
+
+        $config = $sprinklerController->GetConfig();
+
+        return true;
     }
 
     private function GetStations(&$stations) : bool

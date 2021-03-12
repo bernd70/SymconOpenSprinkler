@@ -65,6 +65,12 @@ class SprinklerController
             return false;
         }
 
+        if (!property_exists($jsonData, "options"))
+        {
+            $error = "Section [options] missing from json";
+            return false;
+        }
+
         if (!property_exists($jsonData, "stations"))
         {
             $error = "Section [stations] missing from json";
@@ -83,7 +89,7 @@ class SprinklerController
             return false;
         }
 
-        if (!$this->InitConfigFromJson($jsonData->settings, $error))
+        if (!$this->InitConfigFromJson($jsonData->settings, $jsonData->options, $error))
             return false;
 
         if (!$this->InitStationsFromJson($jsonData->stations, $jsonData->status, $jsonData->settings->ps, $error))
@@ -177,7 +183,7 @@ class SprinklerController
             if ($result !== false && $status == 200 /* HTTP_OK */)
                 break;
 
-            $this->Log(self::LOG_DEBUG, __FUNCTION__, "Web Request Error $error on attempt $attempt)");
+            $this->Log(self::LOG_DEBUG, __FUNCTION__, "Web Request Error on attempt $attempt: $error");
             $attempt++;
 
             sleep(1);
@@ -241,14 +247,19 @@ class SprinklerController
         return true;
     }
 
-    private function InitConfigFromJson($jsonData, &$error) : bool
+    private function InitConfigFromJson($jsonDataSettings, $jsonDataOptions, &$error) : bool
     {
-        GetJsonProperty($jsonData, "devt", $this->SprinklerControllerConfig->DeviceTime, 0);
-        GetJsonProperty($jsonData, "nbrd", $this->SprinklerControllerConfig->NumberOfBoards, 1);
-        GetJsonProperty($jsonData, "en", $this->SprinklerControllerConfig->OperationEnable, false);
-        GetJsonProperty($jsonData, "sn1", $this->SprinklerControllerConfig->Sensor1Active, false);
-        GetJsonProperty($jsonData, "sn2", $this->SprinklerControllerConfig->Sensor2Active, false);
-        GetJsonProperty($jsonData, "rdst", $this->SprinklerControllerConfig->RainDelay, false);
+        GetJsonProperty($jsonDataSettings, "devt", $this->SprinklerControllerConfig->DeviceTime, 0);
+        GetJsonProperty($jsonDataSettings, "nbrd", $this->SprinklerControllerConfig->NumberOfBoards, 1);
+
+        GetJsonProperty($jsonDataOptions, "sn1t", $this->SprinklerControllerConfig->Sensor1Type, SprinklerControllerConfig::SENSORTYPE_Inactive);
+        GetJsonProperty($jsonDataOptions, "sn2t", $this->SprinklerControllerConfig->Sensor2Type, SprinklerControllerConfig::SENSORTYPE_Inactive);
+
+        GetJsonProperty($jsonDataSettings, "en", $this->SprinklerControllerConfig->OperationEnable, false);
+        GetJsonProperty($jsonDataSettings, "rdst", $this->SprinklerControllerConfig->RainDelay, false);
+
+        GetJsonProperty($jsonDataOptions, "wl", $this->SprinklerControllerConfig->WaterLevel, 100);
+        GetJsonProperty($jsonDataOptions, "uwt", $this->SprinklerControllerConfig->WeatherMethod, SprinklerControllerConfig::WEATHERMETHOD_Manual);
 
         return true;
     }
@@ -312,11 +323,18 @@ class SprinklerController
             $station = new SprinklerStation($key, $stationName, $enabled, $active);
 
             GetSprinklerOptionFromArray($jsonDataIgnoreRain, $key, $ignoreRain);
-            GetSprinklerOptionFromArray($jsonDataIgnoreSensor1, $key, $ignoreSensor1);
             GetSprinklerOptionFromArray($jsonDataIgnoreSensor2, $key, $ignoreSensor2);
             GetSprinklerOptionFromArray($jsonDataSerialized, $key, $serialized);
 
-            $station->SetOptions(!$ignoreRain, !$ignoreSensor1, !$ignoreSensor2, $serialized);
+            $sensor1Enabled = null;
+            if ($this->SprinklerControllerConfig->Sensor1Type != SprinklerControllerConfig::SENSORTYPE_Inactive)
+                GetSprinklerOptionFromArray($jsonDataIgnoreSensor1, $key, $sensor1Enabled, true);
+
+            $sensor2Enabled = null;
+            if ($this->SprinklerControllerConfig->Sensor2Type != SprinklerControllerConfig::SENSORTYPE_Inactive)
+                GetSprinklerOptionFromArray($jsonDataIgnoreSensor2, $key, $sensor2Enabled, true);
+
+            $station->SetOptions(!$ignoreRain, $sensor1Enabled, $sensor2Enabled, $serialized);
 
             $schedule = $jsonDataProgramStatus[$key];
             if ($schedule[0] != 0)
@@ -389,14 +407,19 @@ class SprinklerController
         return -1;
     }
 
-    public function GetConfigAsJson(bool $includeDeviceTime = false)
+    public function GetConfig(bool $removeStaticData = false)
     {
-        $config = $this->SprinklerControllerConfig;
+        if ($removeStaticData)
+        {
+            $config = new SprinklerControllerConfig($this->SprinklerControllerConfig);
 
-        if (!$includeDeviceTime)
             unset($config->DeviceTime);
+            unset($config->NumberOfBoards);
 
-        return json_encode($config);
+            return $config;
+        }
+        else
+            return $this->SprinklerControllerConfig;
     }
 
     // public function UpdateSprinklerOptionInArray(int $sprinklerIndex, bool $enableOption, array &$newJsonDataDisabled) : bool
@@ -426,8 +449,15 @@ class SprinklerController
         print("Number of Boards: " . $this->SprinklerControllerConfig->NumberOfBoards . "\n");
         print("Operation Enable: " . ($this->SprinklerControllerConfig->OperationEnable ? "Yes" : "No") . "\n");
 
-        print("Sensor 1: " . ($this->SprinklerControllerConfig->Sensor1Active ? "Active" : "Not active") . "\n");
-        print("Sensor 2: " . ($this->SprinklerControllerConfig->Sensor2Active ? "Active" : "Not active") . "\n");
+        if ($this->SprinklerControllerConfig->Sensor1Type != SprinklerControllerConfig::SENSORTYPE_Inactive)
+            print("Sensor 1: " . $this->SprinklerControllerConfig->GetSensor1Type() . "\n");
+
+        if ($this->SprinklerControllerConfig->Sensor2Type != SprinklerControllerConfig::SENSORTYPE_Inactive)
+            print("Sensor 2: " . $this->SprinklerControllerConfig->GetSensor2Type() . "\n");
+
+        print("Water Level: " . $this->SprinklerControllerConfig->WaterLevel . "%\n");
+
+        print("Weather Method: " . $this->SprinklerControllerConfig->GetWeatherMethod() . "\n");
 
         print("Rain delay: " . $this->SprinklerControllerConfig->GetLocalRainDelayTimeAsString() . "\n");
 
