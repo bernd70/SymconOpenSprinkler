@@ -37,7 +37,7 @@ class OpenSprinklerController extends BaseIPSModule
         // Diese Zeile nicht löschen
         parent::ApplyChanges();
 
-        $receiveDataFilter = ".*\"Destination\":\"" . OpenSprinklerStation::class . "\".*";
+        $receiveDataFilter = ".*\"Destination\":\"" . OpenSprinklerController::class . "\".*";
         $this->SendDebug(__FUNCTION__, "ReceiveDataFilter=" . $receiveDataFilter, 0);
         $this->SetReceiveDataFilter($receiveDataFilter);
 
@@ -235,7 +235,7 @@ class OpenSprinklerController extends BaseIPSModule
             $this->SendDebug(__FUNCTION__, 'has no active parent', 0);
             $this->LogMessage('has no active parent instance', KL_WARNING);
 
-            return null;
+            return new SprinklerControllerConfig;
         }
 
         $sendData = ['DataID' => OpenSprinklerIO::MODULE_GUID_RX, 'Command' => OpenSprinklerIO::CMD_GetControllerConfig];
