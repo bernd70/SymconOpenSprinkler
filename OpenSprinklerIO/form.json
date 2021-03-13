@@ -1,5 +1,5 @@
 {
-    "elements": 
+    "elements":
     [
         {
             "name": "Host",
@@ -16,11 +16,10 @@
             "type": "NumberSpinner",
             "caption": "Polling interval",
             "suffix": "seconds"
-        }       
+        }
     ],
     "actions":
     [
-        { "type": "Button", "label": "Test 1", "onClick": "OpenSprinkler_Test1($id);" }
     ],
     "status":
     [

@@ -122,21 +122,32 @@ Wert | Bezeichnung          | Anmerkung
 Soweit nicht anders angegeben, liefern die Funktionen keinen Rückgabewert.
 
 ```php
-OpenSprinkler_EnableStation(integer $InstanzID, int $stationIndex);
+OpenSprinkler_EnableStation(integer $stationInstanceId, bool $enable);
 ```
-TBD
+Aktiviert oder deaktiviert eine Bewässerungsstation.
 
 ```php
-OpenSprinkler_SwitchStation(integer $InstanzID, int $stationIndex);
+OpenSprinkler_SwitchStation(integer $stationInstanceId, bool $enable, int $duration);
 ```
-TBD
+Schaltet eine einzelne Station für eine bestimmte Zeit (in Sekunden) ein oder aus. Bie Ausschalten wird der parameter $duration ignoriert.
 
 ```php
-OpenSprinkler_StopAllStations(integer $InstanzID, string $programName);
+OpenSprinkler_StopAllStations(integer $constrollerInstanceId);
 ```
-TBD
+Stoppt alle Stationen an einem Controller. Auch bereits anstehende Läufe werden gelöscht.
 
 ```php
-OpenSprinkler_RunProgram(integer $InstanzID, string $programName);
+OpenSprinkler_RunProgram(integer $constrollerInstanceId, string $programName, bool $useWeather);
 ```
-TBD
+Startet ein Beregnungsprogramm über den Namen. Zusätzlich kann festgelegt werden, ob die wetterabhängige Steuerung genuzt werden soll.
+
+```php
+OpenSprinkler_GetStationIndex(integer $constrollerInstanceId, string $name) : int;
+```
+Liefert den Index einer Bewässerungsstation für einen bestimmten Controller über den Namen. Groß- und Kleinschreibung wird nicht beachtet.
+
+```php
+OpenSprinkler_UpdateStatus(integer $constrollerInstanceId);
+```
+Liest den Controller neu aus und aktualisiert die IP-Symcon Variablen. Der Aufruf erfolgt zyklisch und muss nicht manuell erfolgen.
+
