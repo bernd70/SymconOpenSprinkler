@@ -192,7 +192,6 @@ class SprinklerController
             curl_setopt($request, CURLOPT_USERAGENT, "SymconOpenSprinkler");
             curl_setopt($request, CURLOPT_CONNECTTIMEOUT, 5);
             curl_setopt($request, CURLOPT_TIMEOUT, 5);
-            curl_setopt($request, CURLOPT_POST, true);
             curl_setopt($request, CURLOPT_RETURNTRANSFER, 1);
 
             $result = curl_exec($request);
