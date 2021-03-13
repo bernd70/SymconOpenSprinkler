@@ -101,9 +101,31 @@ class SprinklerController
         return true;
     }
 
+    public function EnableController(bool $enable, &$error) : bool
+    {
+        return $this->ExecuteCommand("cv", "en=" . intval($enable), $jsonData, $error);
+    }
+
     public function EnableStation(int $stationIndex, bool $enable, &$error) : bool
     {
-        return $this->ExecuteCommand("cs", "d$stationIndex=" . intval($enable), $jsonData, $error);
+        if (!$this->ExecuteCommand("jn", "", $stationAttributes, $error))
+            return false;
+
+        $this->GetBoardAndStationIndex($stationIndex, $boardIndex, $boardStationIndex);
+
+        $stationBit = pow(2, $boardStationIndex);
+        $disabledMask = $stationAttributes->stn_dis[$boardIndex];
+
+        // Already in desired state
+        if ($disabledMask & $stationBit == !$enable)
+            return true;
+
+        if (!$enable)
+            $newDisabledMask = $disabledMask | $stationBit;
+        else
+            $newDisabledMask = $disabledMask - $stationBit;
+
+        return $this->ExecuteCommand("cs", "d$boardIndex=$newDisabledMask", $jsonData, $error);
     }
 
     public function SwitchStation(int $stationIndex, bool $enable, int $duration, &$error) : bool
@@ -378,6 +400,9 @@ class SprinklerController
 
     public function GetStation(int $index) : SprinklerStation
     {
+        if ($index >= $this->GetStationCount())
+            return null;
+
         return $this->stations[$index];
     }
 
@@ -393,6 +418,9 @@ class SprinklerController
 
     public function GetProgram(int $index) : SprinklerProgram
     {
+        if ($index >= $this->GetProgramCount())
+            return null;
+
         return $this->programs[$index];
     }
 
@@ -420,6 +448,12 @@ class SprinklerController
         }
         else
             return $this->SprinklerControllerConfig;
+    }
+
+    private function GetBoardAndStationIndex(int $stationIndex, &$boardIndex, &$boardStationIndex)
+    {
+        $boardIndex = intval($stationIndex / 8);
+        $boardStationIndex = $stationIndex % 8;
     }
 
     // public function UpdateSprinklerOptionInArray(int $sprinklerIndex, bool $enableOption, array &$newJsonDataDisabled) : bool

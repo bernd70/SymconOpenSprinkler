@@ -304,6 +304,30 @@ class OpenSprinklerController extends BaseIPSModule
         return $tree_position;
     }
 
+    public function EnableController(bool $enable)
+    {
+        $sendData = [
+            'DataID' => OpenSprinklerIO::MODULE_GUID_RX,
+            'Command' => OpenSprinklerIO::CMD_EnableController,
+            OpenSprinklerIO::CMDPARAM_Enable => $enable
+        ];
+
+        $this->SendDataToParent(json_encode($sendData));
+    }
+
+    public function GetStationIndex(string $name) : int
+    {
+        $stations = $this->GetStations();
+
+        foreach ($stations as $station)
+        {
+            if (strcasecmp($station->Name, $name) == 0)
+                return $station->Index;
+        }
+
+        return -1;
+    }
+
     public function StopAllStations()
     {
         $sendData = [

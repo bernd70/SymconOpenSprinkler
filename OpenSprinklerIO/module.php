@@ -25,6 +25,7 @@ class OpenSprinklerIO extends BaseIPSModule
     const CMD_GetControllerConfig = "GetControllerConfig";
     const CMD_GetStations = "GetStations";
 
+    const CMD_EnableController = "EnableController";
     const CMD_EnableStation = "EnableStation";
     const CMD_SwitchStation = "SwitchStation";
     const CMD_StopAllStations = "StopAllStations";
@@ -116,6 +117,7 @@ class OpenSprinklerIO extends BaseIPSModule
 
         $config = $sprinklerController->GetConfig(true);
         $configMD5 = MD5(json_encode($config));
+        // $this->SendDebug(__FUNCTION__, 'configMD5 old=' . $this->GetBuffer("Config") . ", new =$configMD5", 0);
 
         if ($this->GetBuffer("Config") !== $configMD5)
         {
@@ -191,6 +193,10 @@ class OpenSprinklerIO extends BaseIPSModule
 
                 case self::CMD_GetStations:
                     $result = $this->GetStations($ret);
+                    break;
+
+                case self::CMD_EnableController;
+                    $result = $this->EnableController($jdata[self::CMDPARAM_Enable]);
                     break;
 
                 case self::CMD_EnableStation:
@@ -295,6 +301,18 @@ class OpenSprinklerIO extends BaseIPSModule
         $stations = $sprinklerController->GetStations();
 
         return true;
+    }
+
+    private function EnableController(bool $enable) : bool
+    {
+        $this->LogMessage("EnableController enable=$enable", KL_NOTIFY);
+
+        $sprinklerController = $this->InitController();
+
+        if ($sprinklerController == false)
+            return false;
+
+        return $sprinklerController->EnableController($enable, $error);
     }
 
     private function EnableStation(int $stationIndex, bool $enable) : bool
