@@ -1,11 +1,11 @@
 {
 	"id": "{9A5927FD-F8FD-71DC-5476-6108A289441F}",
 	"name": "OpenSprinklerController",
-	"type": 3,
+	"type": 1,
 	"vendor": "OpenSprinkler",
 	"aliases": [ "OpenSprinkler Controller"],
-	"parentRequirements": [ "{E04B8FB3-7E04-8240-B071-A4ACDF2D3BA1}" ],
-	"childRequirements": [],
-	"implemented": [ "{6B94F6BD-A4F6-87B3-A9D1-907A1D7C30EF}" ],
+	"parentRequirements": [],
+	"childRequirements": [ "{E04B8FB3-7E04-8240-B071-A4ACDF2D3BA1}" ],
+	"implemented": [ "{E23D04A3-4D6D-F886-36E9-4AD77509705F}" ],
 	"prefix": "OpenSprinkler"
 }
