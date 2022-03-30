@@ -3,6 +3,7 @@
         "de": {
             "Station Configuration": "Stationskonfiguration",
             "Station Index: %s": "Stationsindex: %s",
+            "Controller Id: %s": "Controller Id: %s",
             "Polling Interval": "Abfrageintervall",
             "Activate exteded logging": "Erweitertes Logging aktivieren",
             "Enabled": "Aktiviert",

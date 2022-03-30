@@ -140,22 +140,24 @@ class OpenSprinklerController extends BaseIPSModule
         {
             $importCategoryLocation = $this->GetImportCategoryLocation();
 
-            foreach ($stations as $station)
+            foreach ($stations as $stdClassStation)
             {
-                $instanceId = $this->GetStationInstance("", $station->Index);
+                $station = new SprinklerStation(0, "", false, false);
+                $station->InitFromStdClass($stdClassStation);
 
                 $addValue = [
                     "Name"        => $station->Name,
                     "Index"       => $station->Index,
                     "Enabled"     => $this->Translate($station->Enabled ? "Yes" : "No"),
-                    "instanceID"  => $instanceId,
+                    "instanceID"  => $this->GetStationInstance("", $station->Index),
                     "create"      => [
                         "moduleID" => "{DE0EA757-F6F3-4CC7-3FD0-39622E94EB35}",
                         "location" => $importCategoryLocation,
                         "name" => $station->Name,
                         "configuration" => [
+                            OpenSprinklerStation::PROPERTY_Controller => $this->InstanceID,
                             OpenSprinklerStation::PROPERTY_Index => $station->Index
-                        ]
+                         ]
                     ],
                 ];
 
@@ -181,7 +183,7 @@ class OpenSprinklerController extends BaseIPSModule
         $form = [];
         $form["elements"] = $elements;
 
-        $this->SendDebug(__FUNCTION__, "form=" . print_r($form, true), 0);
+        // $this->SendDebug(__FUNCTION__, "form=" . print_r($form, true), 0);
 
         return json_encode($form);
     }
@@ -345,6 +347,17 @@ class OpenSprinklerController extends BaseIPSModule
             'Command' => OpenSprinklerIO::CMD_RunProgram,
             OpenSprinklerIO::CMDPARAM_Name => $programName,
             OpenSprinklerIO::CMDPARAM_UseWeather => $useWeather
+        ];
+
+        $this->SendDataToParent(json_encode($sendData));
+    }
+
+    public function SetRainDelay(int $hours)
+    {
+        $sendData = [
+            'DataID' => OpenSprinklerIO::MODULE_GUID_RX,
+            'Command' => OpenSprinklerIO::CMD_SetRainDelay,
+            OpenSprinklerIO::CMDPARAM_Hours => $hours
         ];
 
         $this->SendDataToParent(json_encode($sendData));

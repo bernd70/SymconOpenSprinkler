@@ -93,6 +93,11 @@ OpenSprinkler_RunProgram(integer $constrollerInstanceId, string $programName, bo
 Startet ein Beregnungsprogramm über den Namen. Zusätzlich kann festgelegt werden, ob die wetterabhängige Steuerung genuzt werden soll.
 
 ```php
+OpenSprinkler_SetRainDela(integer $hours);
+```
+Aktiviert die Regenverzögerung für die angegebene Anzahl von Stunden. Bei $hours = 0 wird die Regenverzögerung ausgeschaltet.
+
+```php
 OpenSprinkler_GetStationIndex(integer $constrollerInstanceId, string $name) : int;
 ```
 Liefert den Index einer Bewässerungsstation für einen bestimmten Controller über den Namen. Groß- und Kleinschreibung wird nicht beachtet.

@@ -26,7 +26,7 @@ class SprinklerControllerConfig
     const WEATHERMETHOD_AutoDelayOnRain = 2;
     const WEATHERMETHOD_Evapotranspiration = 3;
 
-    var $DeviceTime;
+    var $DeviceTime = 0;
     var $NumberOfBoards = 0;
     var $OperationEnable = false;
     var $Sensor1Type = self::SENSORTYPE_Inactive;
@@ -37,13 +37,16 @@ class SprinklerControllerConfig
 
     function GetLocalDeviceTimeAsString(string $format = self::DATETIMEFORMAT_Default) : string
     {
+        if ($this->DeviceTime === 0)
+            return "Undefined";
+
         return $this->LocalToUtcTime($this->DeviceTime)->format($format);
     }
 
     function GetLocalRainDelayTimeAsString(string $format = self::DATETIMEFORMAT_Default) : string
     {
         if ($this->RainDelay == 0)
-            return "";
+            return "Undefined";
 
         return $this->LocalToUtcTime($this->RainDelay)->format($format);
     }

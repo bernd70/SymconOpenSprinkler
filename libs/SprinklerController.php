@@ -145,6 +145,12 @@ class SprinklerController
         return $this->ExecuteCommand("mp", "pid=$programIndex&uwt=" . intval($useWeather), $jsonData, $error);
     }
 
+
+    public function SetRainDleay(int $hours, &$error) : bool
+    {
+        return $this->ExecuteCommand("cv", "rd=$hours", $jsonData, $error);
+    }
+
     public function StopAllStations(&$error) : bool
     {
         $success = true;

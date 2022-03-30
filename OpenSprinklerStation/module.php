@@ -8,20 +8,16 @@ require_once __DIR__ . "/../OpenSprinklerIO/module.php";
 
 class OpenSprinklerStation extends BaseIPSModule
 {
+    const PROPERTY_Controller = "Controller";
     const PROPERTY_Index = "Index";
 
     const VARIABLE_Status = "Status";
-
-    const STATIONSTATUS_Unknown = 0;
-    const STATIONSTATUS_Deactivated = 1;
-    const STATIONSTATUS_Idle = 2;
-    const STATIONSTATUS_Scheduled = 3;
-    const STATIONSTATUS_Running = 4;
-
     const VARIABLE_WeatherAdjusted = "WeatherAdjusted";
     const VARIABLE_Sensor1Enabled = "Sensor1Enabled";
     const VARIABLE_Sensor2Enabled = "Sensor2Enabled";
     const VARIABLE_Serialized = "Serialized";
+
+    const CMD_StationStatus = "StationStatus"; // Data darf ein Array sein oder ein einzelnes Objekt
 
     public function Create()
     {
@@ -53,12 +49,11 @@ class OpenSprinklerStation extends BaseIPSModule
         {
             $this->SetStatus(201);
         }
-
-
     }
 
     private function RegisterProperties()
     {
+        $this->RegisterPropertyInteger(self::PROPERTY_Controller, -1);
         $this->RegisterPropertyInteger(self::PROPERTY_Index, -1);
     }
 
@@ -68,11 +63,11 @@ class OpenSprinklerStation extends BaseIPSModule
         {
             IPS_CreateVariableProfile("OpenSprinkler.StationStatus", 1);
 
-            IPS_SetVariableProfileAssociation("OpenSprinkler.StationStatus", self::STATIONSTATUS_Unknown, $this->Translate("Unknown"), "", -1);
-            IPS_SetVariableProfileAssociation("OpenSprinkler.StationStatus", self::STATIONSTATUS_Deactivated, $this->Translate("Deactivated"), "", -1);
-            IPS_SetVariableProfileAssociation("OpenSprinkler.StationStatus", self::STATIONSTATUS_Idle, $this->Translate("Idle"), "", -1);
-            IPS_SetVariableProfileAssociation("OpenSprinkler.StationStatus", self::STATIONSTATUS_Scheduled, $this->Translate("Scheduled"), "", -1);
-            IPS_SetVariableProfileAssociation("OpenSprinkler.StationStatus", self::STATIONSTATUS_Running, $this->Translate("Running"), "", -1);
+            IPS_SetVariableProfileAssociation("OpenSprinkler.StationStatus", SprinklerStation::STATUS_Unknown, $this->Translate("Unknown"), "", -1);
+            IPS_SetVariableProfileAssociation("OpenSprinkler.StationStatus", SprinklerStation::STATUS_Deactivated, $this->Translate("Deactivated"), "", -1);
+            IPS_SetVariableProfileAssociation("OpenSprinkler.StationStatus", SprinklerStation::STATUS_Idle, $this->Translate("Idle"), "", -1);
+            IPS_SetVariableProfileAssociation("OpenSprinkler.StationStatus", SprinklerStation::STATUS_Scheduled, $this->Translate("Scheduled"), "", -1);
+            IPS_SetVariableProfileAssociation("OpenSprinkler.StationStatus", SprinklerStation::STATUS_Running, $this->Translate("Running"), "", -1);
         }
     }
 
@@ -81,6 +76,7 @@ class OpenSprinklerStation extends BaseIPSModule
         $this->RegisterVariableInteger(self::VARIABLE_Status, $this->Translate("Status"), "OpenSprinkler.StationStatus", 1);
 
         $this->RegisterVariableBoolean(self::VARIABLE_WeatherAdjusted, $this->Translate("WeatherAdjusted"), "~Switch", 10);
+        // VARIABLE_Sensor1Enabled und VARIABLE_Sensor2Enabled werden automatisch und nur dann erstellt, wenn am Controller vorhanden
         $this->RegisterVariableBoolean(self::VARIABLE_Serialized, $this->Translate("Serialized"), "~Switch", 13);
 
         $this->EnableAction(self::VARIABLE_WeatherAdjusted);
@@ -89,8 +85,6 @@ class OpenSprinklerStation extends BaseIPSModule
 
     public function GetConfigurationForm()
     {
-        $stationIndex = $this->ReadPropertyInteger(self::PROPERTY_Index);
-
         $elements = [];
 
         $elements[] = [
@@ -100,8 +94,13 @@ class OpenSprinklerStation extends BaseIPSModule
             [
                 [
                     "type" => "Label",
+                    "name" => "Controller",
+                    "caption" => sprintf($this->Translate("Controller Id: %s"), $this->ReadPropertyInteger(self::PROPERTY_Controller))
+                ],
+                [
+                    "type" => "Label",
                     "name" => "StationIndex",
-                    "caption" => sprintf($this->Translate("Station Index: %s"), $stationIndex)
+                    "caption" => sprintf($this->Translate("Station Index: %s"), $this->ReadPropertyInteger(self::PROPERTY_Index))
                 ]
             ]
         ];
@@ -111,25 +110,25 @@ class OpenSprinklerStation extends BaseIPSModule
         $actions[] = [
             "type" => "Button",
             "label" => "Enable",
-            "onClick" => "OpenSprinkler_Enable(\$id, true);"
+            "onClick" => "OpenSprinkler_EnableStation(\$id, true);"
         ];
 
         $actions[] = [
             "type" => "Button",
             "label" => "Disable",
-            "onClick" => "OpenSprinkler_Enable(\$id, false);"
+            "onClick" => "OpenSprinkler_EnableStation(\$id, false);"
         ];
 
         $actions[] = [
             "type" => "Button",
             "label" => "Start (30s)",
-            "onClick" => "OpenSprinkler_Run(\$id, true, 30);"
+            "onClick" => "OpenSprinkler_SwitchStation(\$id, true, 30);"
         ];
 
         $actions[] = [
             "type" => "Button",
             "label" => "Stop",
-            "onClick" => "OpenSprinkler_Run(\$id, false, 0);"
+            "onClick" => "OpenSprinkler_SwitchStation(\$id, false, 0);"
         ];
 
         $form = [];
@@ -143,7 +142,7 @@ class OpenSprinklerStation extends BaseIPSModule
 
     public function ReceiveData($jsonString)
     {
-        // $this->SendDebug(__FUNCTION__, "data=" . $jsonString, 0);
+        $this->SendDebug(__FUNCTION__, "data=" . $jsonString, 0);
 
         // Empfangene Daten vom IO Modul
         $jsonMsg = json_decode($jsonString);
@@ -165,15 +164,22 @@ class OpenSprinklerStation extends BaseIPSModule
 
         switch ($command)
         {
-            case OpenSprinklerIO::CMD_StationStatus:
-                $stations = $msg->{OpenSprinklerIO::MSGARG_Data};
+            case self::CMD_StationStatus:
+                $data = $msg->{OpenSprinklerIO::MSGARG_Data};
 
                 $stationIndex = $this->ReadPropertyInteger(self::PROPERTY_Index);
 
-                foreach ($stations as $station)
+                if (is_array($data))
                 {
-                    if ($station->Index == $stationIndex)
-                        $this->UpdateVariables($station);
+                    foreach ($data as $station)
+                    {
+                        if ($station->Index == $stationIndex)
+                            $this->UpdateVariables($station);
+                    }
+                }
+                else if (is_object($data))
+                {
+                    $this->UpdateVariables($data);
                 }
                 break;
         }
@@ -189,48 +195,55 @@ class OpenSprinklerStation extends BaseIPSModule
                 // TBD
                 break;
 
+            case self::VARIABLE_Sensor1Enabled:
+                // TBD
+                break;
+
+            case self::VARIABLE_Sensor2Enabled:
+                // TBD
+                break;
+
             case self::VARIABLE_Serialized:
                 // TBD
                 break;
         }
     }
 
-    private function UpdateVariables($station)
+    private function UpdateVariables($stationData)
     {
-        $this->SendDebug(__FUNCTION__, "index=$station->Index, data=" . print_r($station, true), 0);
+        $this->SendDebug(__FUNCTION__, "index=$stationData->Index, data=" . print_r($stationData, true), 0);
 
-        if (!$station->Enabled)
-            SetValueInteger($this->GetIDForIdent(self::VARIABLE_Status), self::STATIONSTATUS_Deactivated);
-        else if ($station->Active)
-            SetValueInteger($this->GetIDForIdent(self::VARIABLE_Status), self::STATIONSTATUS_Running);
-        else if ($station->ScheduledTime != 0)
-            SetValueInteger($this->GetIDForIdent(self::VARIABLE_Status), self::STATIONSTATUS_Scheduled);
-        else
-            SetValueInteger($this->GetIDForIdent(self::VARIABLE_Status), self::STATIONSTATUS_Idle);
+        SetValueInteger($this->GetIDForIdent(self::VARIABLE_Status), SprinklerStation::TranslateToStatus($stationData->Enabled, $stationData->Active, $stationData->ScheduledTime));
 
-        SetValueBoolean($this->GetIDForIdent(self::VARIABLE_WeatherAdjusted), $station->WeatherAdjusted);
+        SetValueBoolean($this->GetIDForIdent(self::VARIABLE_WeatherAdjusted), $stationData->WeatherAdjusted);
 
-        if ($station->Sensor1Enabled == null)
+        if ($stationData->Sensor1Enabled == null)
         {
             $this->UnregisterVariable(self::VARIABLE_Sensor1Enabled);
         }
         else
         {
-            $this->RegisterVariableBoolean(self::VARIABLE_Sensor1Enabled, $this->Translate("Sensor 1 Enabled"), "~Switch", 11);
-            SetValueBoolean($this->GetIDForIdent(self::VARIABLE_Sensor1Enabled), $station->Sensor1Enabled);
+            if ($this->GetIDForIdent(self::VARIABLE_Sensor1Enabled) === false)
+                $this->RegisterVariableBoolean(self::VARIABLE_Sensor1Enabled, $this->Translate("Sensor 1 Enabled"), "~Switch", 11);
+
+            SetValueBoolean($this->GetIDForIdent(self::VARIABLE_Sensor1Enabled), $stationData->Sensor1Enabled);
+            $this->EnableAction(self::VARIABLE_Sensor1Enabled);
         }
 
-        if ($station->Sensor2Enabled == null)
+        if ($stationData->Sensor2Enabled == null)
         {
             $this->UnregisterVariable(self::VARIABLE_Sensor2Enabled);
         }
         else
         {
-            $this->RegisterVariableBoolean(self::VARIABLE_Sensor2Enabled, $this->Translate("Sensor 2 Enabled"), "~Switch", 11);
-            SetValueBoolean($this->GetIDForIdent(self::VARIABLE_Sensor2Enabled), $station->Sensor2Enabled);
+            if ($this->GetIDForIdent(self::VARIABLE_Sensor2Enabled) === false)
+                $this->RegisterVariableBoolean(self::VARIABLE_Sensor2Enabled, $this->Translate("Sensor 2 Enabled"), "~Switch", 12);
+
+            SetValueBoolean($this->GetIDForIdent(self::VARIABLE_Sensor2Enabled), $stationData->Sensor2Enabled);
+            $this->EnableAction(self::VARIABLE_Sensor2Enabled);
         }
 
-        SetValueBoolean($this->GetIDForIdent(self::VARIABLE_Serialized), $station->Serialized);
+        SetValueBoolean($this->GetIDForIdent(self::VARIABLE_Serialized), $stationData->Serialized);
     }
 
     public function EnableStation(bool $enable)
@@ -253,6 +266,17 @@ class OpenSprinklerStation extends BaseIPSModule
             OpenSprinklerIO::CMDPARAM_Index => $this->ReadPropertyInteger(self::PROPERTY_Index),
             OpenSprinklerIO::CMDPARAM_Enable => $enable,
             OpenSprinklerIO::CMDPARAM_Duration => $duration
+        ];
+
+        $this->SendDataToParent(json_encode($sendData));
+    }
+
+    public function RequestStationStatus()
+    {
+        $sendData = [
+            'DataID' => OpenSprinklerIO::MODULE_GUID_RX,
+            'Command' => OpenSprinklerIO::CMD_RequestStationStatus,
+            OpenSprinklerIO::CMDPARAM_Index => $this->ReadPropertyInteger(self::PROPERTY_Index)
         ];
 
         $this->SendDataToParent(json_encode($sendData));

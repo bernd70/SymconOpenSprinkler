@@ -20,16 +20,19 @@ class OpenSprinklerIO extends BaseIPSModule
     const CMDPARAM_Enable = "Enable";
     const CMDPARAM_Duration = "Duration"; // seconds
     const CMDPARAM_UseWeather = "UseWeather";
+    const CMDPARAM_Hours = "Hours";
 
     // Commands
     const CMD_GetControllerConfig = "GetControllerConfig";
     const CMD_GetStations = "GetStations";
+    const CMD_RequestStationStatus = "RequestStationStatus";
 
     const CMD_EnableController = "EnableController";
     const CMD_EnableStation = "EnableStation";
     const CMD_SwitchStation = "SwitchStation";
     const CMD_StopAllStations = "StopAllStations";
     const CMD_RunProgram = "RunProgram";
+    const CMD_SetRainDelay = "SetRainDelay";
 
     const CMD_StationStatus = "StationStatus";
     const CMD_ControllerConfig = "ControllerConfig";
@@ -83,12 +86,12 @@ class OpenSprinklerIO extends BaseIPSModule
         // Diese Zeile nicht löschen
         parent::ApplyChanges();
 
-        if ($this->UpdateStatus())
+        if ($this->InternalUpdateStatus(false, false))
         {
             $this->SetStatus(IS_ACTIVE);
 
             // Start UpdateStatus Timer
-            $this->SetTimerInterval('Update', $this->ReadPropertyInteger(self::PROPERTY_UpdateInterval) * 1000);
+            $this->EnableTimer(true);
         }
         else
         {
@@ -99,6 +102,24 @@ class OpenSprinklerIO extends BaseIPSModule
     }
 
     public function UpdateStatus() : bool
+    {
+        return $this->InternalUpdateStatus(true, true);
+    }
+
+    public function UpdateStationStatus() : bool
+    {
+        return $this->InternalUpdateStatus(false, true);
+    }
+
+    private function EnableTimer(bool $enable)
+    {
+        if ($enable)
+            $this->SetTimerInterval('Update', $this->ReadPropertyInteger(self::PROPERTY_UpdateInterval) * 1000);
+        else
+            $this->SetTimerInterval('Update', 0);
+    }
+
+    private function InternalUpdateStatus(bool $forceUpdateConfig, bool $forceUpdateStatus) : bool
     {
         if (!$this->IsConfigured())
             return false;
@@ -119,7 +140,7 @@ class OpenSprinklerIO extends BaseIPSModule
         $configMD5 = MD5(json_encode($config));
         // $this->SendDebug(__FUNCTION__, 'configMD5 old=' . $this->GetBuffer("Config") . ", new =$configMD5", 0);
 
-        if ($this->GetBuffer("Config") !== $configMD5)
+        if ($forceUpdateConfig || $this->GetBuffer("Config") !== $configMD5)
         {
             $this->SendData(OpenSprinklerController::class, OpenSprinklerIO::CMD_ControllerConfig, $config);
 
@@ -129,9 +150,9 @@ class OpenSprinklerIO extends BaseIPSModule
         $stations = $sprinklerController->GetStations();
         $stationStatusMD5 = MD5(json_encode($stations));
 
-        if ($this->GetBuffer("StationStatus") !== $stationStatusMD5)
+        if ($forceUpdateStatus || $this->GetBuffer("StationStatus") !== $stationStatusMD5)
         {
-            $this->SendData(OpenSprinklerStation::class, OpenSprinklerIO::CMD_StationStatus,$stations);
+            $this->SendData(OpenSprinklerStation::class, OpenSprinklerIO::CMD_StationStatus, $stations);
 
             $this->SetBuffer("StationStatus", $stationStatusMD5);
         }
@@ -180,6 +201,8 @@ class OpenSprinklerIO extends BaseIPSModule
         $jdata = json_decode($data, true);
         $this->SendDebug(__FUNCTION__, 'data=' . print_r($jdata, true), 0);
 
+        $updateStationConfig = false;
+        $updateStationStatus = -1;
         $ret = '';
         $command = $jdata['Command'];
 
@@ -195,28 +218,48 @@ class OpenSprinklerIO extends BaseIPSModule
                     $result = $this->GetStations($ret);
                     break;
 
+                case self::CMD_RequestStationStatus:
+                    $result = $this->GetStationStatus($jdata[self::CMDPARAM_Index], $ret);
+                    break;
+
                 case self::CMD_EnableController;
                     $result = $this->EnableController($jdata[self::CMDPARAM_Enable]);
+                    $updateStationConfig = ($result == true);
                     break;
 
                 case self::CMD_EnableStation:
                     $result = $this->EnableStation($jdata[self::CMDPARAM_Index], $jdata[self::CMDPARAM_Enable]);
+                    if ($result == true)
+                        $updateStationStatus = $jdata[self::CMDPARAM_Index];
                     break;
 
                 case self::CMD_SwitchStation:
                     if (!$this->CheckProperties($jdata, $error, self::CMDPARAM_Index, self::CMDPARAM_Enable, self::CMDPARAM_Duration))
                         return false;
                     $result = $this->SwitchStation($jdata[self::CMDPARAM_Index], $jdata[self::CMDPARAM_Enable], $jdata[self::CMDPARAM_Duration]);
+                    if ($result == true)
+                        $updateStationStatus = $jdata[self::CMDPARAM_Index];
                     break;
 
                 case self::CMD_RunProgram:
                     if (!$this->CheckProperties($jdata, $error, self::CMDPARAM_Name, self::CMDPARAM_UseWeather))
                         return false;
                     $result = $this->RunProgram($jdata[self::CMDPARAM_Name], $jdata[self::CMDPARAM_UseWeather]);
+                    if ($result == true)
+                        $updateStationStatus = 999;
+                    break;
+
+                case self::CMD_SetRainDelay:
+                    if (!$this->CheckProperties($jdata, $error, self::CMDPARAM_Hours))
+                        return false;
+                    $result = $this->SetRainDelay($jdata[self::CMDPARAM_Hours]);
+                    $updateStationConfig = ($result == true);
                     break;
 
                 case self::CMD_StopAllStations:
                     $result = $this->StopAllStations();
+                    if ($result == true)
+                        $updateStationStatus = 999;
                     break;
 
                 default:
@@ -230,6 +273,26 @@ class OpenSprinklerIO extends BaseIPSModule
         }
 
         $this->SendDebug(__FUNCTION__, 'ret=' . json_encode($ret), 0);
+
+        if ($updateStationConfig)
+        {
+            $this->GetControllerConfig($config);
+            $this->SendData(OpenSprinklerController::class, OpenSprinklerIO::CMD_ControllerConfig, $config);
+            $this->EnableTimer(true);
+        }
+
+        if ($updateStationStatus == 999)
+        {
+            $this->GetStations($stations);
+            $this->SendData(OpenSprinklerStation::class, OpenSprinklerIO::CMD_StationStatus, $stations);
+            $this->EnableTimer(true);
+        }
+        else if ($updateStationStatus != -1)
+        {
+            $this->GetStationStatus($updateStationStatus, $stationStatus);
+            $this->SendData(OpenSprinklerStation::class, OpenSprinklerIO::CMD_StationStatus, $stationStatus);
+            $this->EnableTimer(true);
+        }
 
         return json_encode($ret);
     }
@@ -320,11 +383,31 @@ class OpenSprinklerIO extends BaseIPSModule
         $this->LogMessage("EnableStation $stationIndex, enable=$enable", KL_NOTIFY);
 
         $sprinklerController = $this->InitController();
-
         if ($sprinklerController == false)
             return false;
 
         return $sprinklerController->EnableStation($stationIndex, $enable, $error);
+    }
+
+    private function GetStationStatus(int $stationIndex, &$stationStatus) : bool
+    {
+        $this->LogMessage("GetStationStatus $stationIndex", KL_NOTIFY);
+
+        $sprinklerController = $this->InitController();
+        if ($sprinklerController == false)
+            return false;
+
+        try
+        {
+            $stationStatus = $sprinklerController->GetStation($stationIndex);
+        }
+        catch (Exception $e)
+        {
+            $stationStatus = "";
+            return false;
+        }
+
+        return true;
     }
 
     private function SwitchStation(int $stationIndex, bool $enable, int $duration) : bool
@@ -348,6 +431,18 @@ class OpenSprinklerIO extends BaseIPSModule
 
         return $sprinklerController->RunProgram($programName, $useWeather, $error);
     }
+
+    private function SetRainDelay(int $hours) : bool
+    {
+        $this->LogMessage("SetRainDelay hours=$hours", KL_NOTIFY);
+
+        $sprinklerController = $this->InitController();
+        if ($sprinklerController == false)
+            return false;
+
+        return $sprinklerController->SetRainDleay($hours, $error);
+    }
+
 
     private function StopAllStations() : bool
     {
