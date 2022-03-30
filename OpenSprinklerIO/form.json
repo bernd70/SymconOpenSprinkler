@@ -1,0 +1,28 @@
+{
+    "elements":
+    [
+        {
+            "name": "Host",
+            "type": "ValidationTextBox",
+            "caption": "Hostname or IP address"
+        },
+        {
+            "name": "Password",
+            "type": "PasswordTextBox",
+            "caption": "Password"
+        },
+        {
+            "name": "UpdateInterval",
+            "type": "NumberSpinner",
+            "caption": "Polling interval",
+            "suffix": "seconds"
+        }
+    ],
+    "actions":
+    [
+    ],
+    "status":
+    [
+        { "code": 201, "icon": "error", "caption": "OpenSprinkler unreachable" }
+    ]
+  }

@@ -4,12 +4,6 @@ declare(strict_types=1);
 
 class SprinklerStation
 {
-    const STATUS_Unknown = 0;
-    const STATUS_Deactivated = 1;
-    const STATUS_Idle = 2;
-    const STATUS_Scheduled = 3;
-    const STATUS_Running = 4;
-
     var $Index = -1;
 
     var $Active = false;
@@ -31,7 +25,7 @@ class SprinklerStation
         $this->Active = $active;
     }
 
-    public function InitFromJson(string $jsonString)
+    public function InitFromJson($jsonString)
     {
         $data = json_decode($jsonString, true);
 
@@ -59,25 +53,6 @@ class SprinklerStation
             $this->ScheduledTime = 0;
             $this->ScheduledDuration = 0;
         }
-    }
-
-    public static function TranslateToStatus(bool $enabled, bool $active, int $scheduledTime) : int
-    {
-        if (!$enabled)
-            return SprinklerStation::STATUS_Deactivated;
-
-        if ($active)
-            return SprinklerStation::STATUS_Running;
-
-        if ($scheduledTime != 0)
-            return SprinklerStation::STATUS_Scheduled;
-
-        return SprinklerStation::STATUS_Idle;
-    }
-
-    public function GetStatus() : int
-    {
-        return SprinklerStation::TranslateToStatus($this->Enabled, $this->Active, $this->ScheduledTime);
     }
 
     public function Dump()

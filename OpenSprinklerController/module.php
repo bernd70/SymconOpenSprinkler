@@ -5,17 +5,11 @@ declare(strict_types=1);
 require_once __DIR__ . "/../libs/BaseIPSModule.php";
 require_once __DIR__ . "/../libs/SprinklerController.php";
 require_once __DIR__ . "/../libs/SprinklerStation.php";
+require_once __DIR__ . "/../OpenSprinklerIO/module.php";
 require_once __DIR__ . "/../OpenSprinklerStation/module.php";
 
 class OpenSprinklerController extends BaseIPSModule
 {
-    const MODULE_GUID = "{9A5927FD-F8FD-71DC-5476-6108A289441F}";
-    // const MODULE_GUID_RX = "{FD530036-4319-5FCF-261B-573E345DD4FE}";
-    // const MODULE_GUID_TX = "{B563DB92-6ACD-0FF6-1CE6-806DDF26FA17}";
-
-    const PROPERTY_Host = "Host";
-    const PROPERTY_Password = "Password";
-    const PROPERTY_UpdateInterval = "UpdateInterval";
     const PROPERTY_ImportCategory = "ImportCategory";
 
     const VARIABLE_Enabled = "Enabled";
@@ -24,22 +18,6 @@ class OpenSprinklerController extends BaseIPSModule
     const VARIABLE_RainDelay = "RainDelay";
     const VARIABLE_Sensor1 = "Sensor1";
     const VARIABLE_Sensor2 = "Sensor2";
-
-   // Commands
-    const CMD_EnableStation = "EnableStation";
-    const CMD_SwitchStation = "SwitchStation";
-
-    // Common parameters
-    const CMDPARAM_Index = "Index";
-    const CMDPARAM_Name = "Name";
-    const CMDPARAM_Enable = "Enable";
-    const CMDPARAM_Duration = "Duration"; // seconds
-    const CMDPARAM_UseWeather = "UseWeather";
-
-    // SendData Args
-    const MSGARG_Destination = "Destination";
-    const MSGARG_Command = "Command";
-    const MSGARG_Data = "Data";
 
     public function Create()
     {
@@ -50,7 +28,8 @@ class OpenSprinklerController extends BaseIPSModule
         $this->RegisterVariableProfiles();
         $this->RegisterVariables();
 
-        $this->RegisterTimer('Update', 0, 'OpenSprinkler_OnTimerUpdateStatus($_IPS[\'TARGET\']);');
+        // Connect to IO
+        $this->ConnectParent(OpenSprinklerIO::MODULE_GUID);
     }
 
     public function ApplyChanges()
@@ -59,7 +38,7 @@ class OpenSprinklerController extends BaseIPSModule
         parent::ApplyChanges();
 
         $receiveDataFilter = ".*\"Destination\":\"" . OpenSprinklerController::class . "\".*";
-        $this->SendDebug(__FUNCTION__, "ReceiveDataFilter=$receiveDataFilter", 0);
+        $this->SendDebug(__FUNCTION__, "ReceiveDataFilter=" . $receiveDataFilter, 0);
         $this->SetReceiveDataFilter($receiveDataFilter);
 
         $refs = $this->GetReferenceList();
@@ -76,27 +55,11 @@ class OpenSprinklerController extends BaseIPSModule
             }
         }
 
-        if ($this->UpdateStatus())
-        {
-            $this->SetStatus(IS_ACTIVE);
-
-            // Start UpdateStatus Timer
-            $this->SetTimerInterval('Update', $this->ReadPropertyInteger(self::PROPERTY_UpdateInterval) * 1000);
-        }
-        else
-        {
-            $this->SetStatus(IS_INACTIVE);
-        }
-
         $this->SetStatus(IS_ACTIVE);
     }
 
     private function RegisterProperties()
     {
-        $this->RegisterPropertyString(self::PROPERTY_Host, "");
-        $this->RegisterPropertyString(self::PROPERTY_Password, "");
-        $this->RegisterPropertyInteger(self::PROPERTY_UpdateInterval, 10);
-
         $this->RegisterPropertyInteger(self::PROPERTY_ImportCategory, 0);
     }
 
@@ -130,33 +93,6 @@ class OpenSprinklerController extends BaseIPSModule
         //     IPS_CreateVariableProfile("OpenSprinkler.Program", 1);
     }
 
-    private function UpdateVariableProfiles(SprinklerController $sprinklerController)
-    {
-        // if (IPS_VariableProfileExists("OpenSprinkler.Station"))
-        //     IPS_DeleteVariableProfile("OpenSprinkler.Station");
-
-        // IPS_CreateVariableProfile("OpenSprinkler.Station", 1);
-
-        // for ($stationIndex = 0; $stationIndex < $sprinklerController->GetStationCount(); $stationIndex++)
-        // {
-        //     $station = $sprinklerController->GetStation($stationIndex);
-
-        //     IPS_SetVariableProfileAssociation("OpenSprinkler.Station", $station->Index, $station->Name, "", -1);
-        // }
-
-        // if (IPS_VariableProfileExists("OpenSprinkler.Program"))
-        //     IPS_DeleteVariableProfile("OpenSprinkler.Program");
-
-        // IPS_CreateVariableProfile("OpenSprinkler.Program", 1);
-
-        // for ($programIndex = 0; $programIndex < $sprinklerController->GetProgramCount(); $programIndex++)
-        // {
-        //     $program = $sprinklerController->GetProgram($programIndex);
-
-        //     IPS_SetVariableProfileAssociation("OpenSprinkler.Program", $program->Index, $program->Name, "", -1);
-        // }
-    }
-
     private function RegisterVariables()
     {
         $this->RegisterVariableBoolean(self::VARIABLE_Enabled, $this->Translate("Enabled"), "~Switch", 1);
@@ -171,255 +107,83 @@ class OpenSprinklerController extends BaseIPSModule
     {
         $elements = [];
 
+        $config = $this->GetConfig();
+
         $elements[] = [
-            "name" => "Host",
-            "type" => "ValidationTextBox",
-            "caption" => $this->Translate("Hostname or IP address")
+            "type" => "ExpansionPanel",
+            "caption" => "Controller Configuration",
+            "items" =>
+            [
+                [
+                    "type" => "Label",
+                    "name" => "DeviceTime",
+                    "caption" => $this->Translate("Device time") . ": " . $config->GetLocalDeviceTimeAsString()
+                ],
+                [
+                    "type" => "Label",
+                    "name" => "NumberOfBoards",
+                    "caption" => $this->Translate("Number of boards") . ": $config->NumberOfBoards"
+                ]
+            ]
         ];
 
         $elements[] = [
-            "name" => "Password",
-            "type" => "PasswordTextBox",
-            "caption" => $this->Translate("Password")
+            "name"  =>  "ImportCategory",
+            "type" => "SelectCategory",
+            "caption" => $this->Translate("Category for new Sprinkler stations")
         ];
 
-        $elements[] = [
-            "name" => "UpdateInterval",
-            "type" => "NumberSpinner",
-            "caption" => $this->Translate("Polling interval"),
-            "suffix" => $this->Translate("seconds")
-        ];
+        $stations = $this->GetStations();
+        $formStations = [];
 
-        if ($this->GetStatus() == IS_ACTIVE)
+        if (count($stations) > 0)
         {
-            if ($this->GetControllerConfig($config) == false)
+            $importCategoryLocation = $this->GetImportCategoryLocation();
+
+            foreach ($stations as $station)
             {
-                $this->SetStatus(201);
-            }
-            else if ($this->IsConfigured())
-            {
-                $elements[] = [
-                    "type" => "ExpansionPanel",
-                    "caption" => "Controller Configuration",
-                    "items" =>
-                    [
-                        [
-                            "type" => "Label",
-                            "name" => "DeviceTime",
-                            "caption" => $this->Translate("Device time") . ": " . $config->GetLocalDeviceTimeAsString()
-                        ],
-                        [
-                            "type" => "Label",
-                            "name" => "NumberOfBoards",
-                            "caption" => $this->Translate("Number of boards") . ": $config->NumberOfBoards"
+                $instanceId = $this->GetStationInstance("", $station->Index);
+
+                $addValue = [
+                    "Name"        => $station->Name,
+                    "Index"       => $station->Index,
+                    "Enabled"     => $this->Translate($station->Enabled ? "Yes" : "No"),
+                    "instanceID"  => $instanceId,
+                    "create"      => [
+                        "moduleID" => "{DE0EA757-F6F3-4CC7-3FD0-39622E94EB35}",
+                        "location" => $importCategoryLocation,
+                        "name" => $station->Name,
+                        "configuration" => [
+                            OpenSprinklerStation::PROPERTY_Index => $station->Index
                         ]
-                    ]
+                    ],
                 ];
 
-                $elements[] = [
-                    "name"  =>  "ImportCategory",
-                    "type" => "SelectCategory",
-                    "caption" => $this->Translate("Category for new Sprinkler stations")
-                ];
-
-                $formStations = [];
-
-                if ($this->GetStations($stations) !== false)
-                {
-                    $importCategoryLocation = $this->GetImportCategoryLocation();
-                    $stationInstanceIds = IPS_GetInstanceListByModuleID(OpenSprinklerStation::MODULE_GUID);
-
-                    foreach ($stations as $station)
-                    {
-                        $stationInstanceId = $this->FindStationInstance($stationInstanceIds, $this->InstanceID, $station->Index);
-
-                        $addValue = [
-                            "Name"        => $station->Name,
-                            "Index"       => $station->Index,
-                            "Enabled"     => $this->Translate($station->Enabled ? "Yes" : "No"),
-                            "instanceID"  => $stationInstanceId,
-                            "create"      => [
-                                "moduleID" => OpenSprinklerStation::MODULE_GUID,
-                                "location" => $importCategoryLocation,
-                                "name" => $station->Name,
-                                "configuration" => [
-                                    OpenSprinklerStation::PROPERTY_Controller => $this->InstanceID,
-                                    OpenSprinklerStation::PROPERTY_Index => $station->Index,
-                                    "variables" => [
-                                        OpenSprinklerStation::VARIABLE_Status => $station->GetStatus(),
-                                        OpenSprinklerStation::VARIABLE_WeatherAdjusted => $station->WeatherAdjusted,
-                                        OpenSprinklerStation::VARIABLE_Sensor1Enabled => $station->Sensor1Enabled,
-                                        OpenSprinklerStation::VARIABLE_Sensor2Enabled => $station->Sensor2Enabled,
-                                        OpenSprinklerStation::VARIABLE_Serialized => $station->Serialized
-                                    ]
-                                ]
-                            ]
-                        ];
-
-                        $formStations[] = $addValue;
-                    }
-
-                    $elements[] = [
-                        "name"      => OpenSprinklerController::class,
-                        "type"      => "Configurator",
-                        "rowCount"  => count($stations) ,
-                        "add"       => false,
-                        "delete"    => false,
-                        "sort"      => [ "column" => "Index", "direction" => "ascending" ],
-                        "columns"   => [
-                            [ "name" => "Index", "caption" => "Index", "width" => "100px", "visible" => true ],
-                            [ "name" => "Enabled", "caption" => "Enabled", "width" => "70px", "visible" => true ],
-                            [ "name" => "Name", "caption" => "Name", "width" => "auto", "visible" => true ]
-                        ],
-                        "values"    => $formStations
-                    ];
-                }
+                $formStations[] = $addValue;
             }
         }
+
+        $elements[] = [
+            "name"      => "OpenSprinklerController",
+            "type"      => "Configurator",
+            "rowCount"  => count($stations) ,
+            "add"       => false,
+            "delete"    => false,
+            "sort"      => [ "column" => "Index", "direction" => "ascending" ],
+            "columns"   => [
+                [ "name" => "Index", "caption" => "Index", "width" => "100px", "visible" => true ],
+                [ "name" => "Enabled", "caption" => "Enabled", "width" => "70px", "visible" => true ],
+                [ "name" => "Name", "caption" => "Name", "width" => "auto", "visible" => true ]
+            ],
+            "values"    => $formStations
+        ];
 
         $form = [];
         $form["elements"] = $elements;
 
-        $status = [];
-
-        $status[] = [
-            "code" => 201,
-            "icon" => "error",
-            "caption" => $this->Translate("OpenSprinkler communications error (Check Host and password, Detail in Log)")
-        ];
-
-        $form["status"] = $status;
-
-        // $this->SendDebug(__FUNCTION__, "form=" . print_r($form, true), 0);
+        $this->SendDebug(__FUNCTION__, "form=" . print_r($form, true), 0);
 
         return json_encode($form);
-    }
-
-    private function InitController()
-    {
-        $sprinklerController = new SprinklerController();
-
-        $sprinklerController->Init($this->ReadPropertyString(self::PROPERTY_Host), $this->ReadPropertyString(self::PROPERTY_Password));
-        $sprinklerController->SetLogCallback(Closure::fromCallable([$this, "LogCallback"]), SprinklerController::LOGLEVEL_DEBUG);
-
-        if (!$sprinklerController->Read($error))
-        {
-            $this->LogMessage("Read Error: " . $error, KL_ERROR);
-            return false;
-        }
-
-        return $sprinklerController;
-    }
-
-    protected function LogCallback(int $logLevel, string $function, string $message)
-    {
-        switch ($logLevel)
-        {
-            case SprinklerController::LOG_INFO:
-                $this->LogMessage($message, KL_NOTIFY);
-                break;
-
-            case SprinklerController::LOG_WARNING:
-                $this->LogMessage($message, KL_WARNING);
-                break;
-
-            case SprinklerController::LOG_ERROR:
-            case SprinklerController::LOG_FATAL:
-                $this->LogMessage($message, KL_ERROR);
-                break;
-
-            case SprinklerController::LOG_DEBUG:
-            default:
-                $this->SendDebug($function, $message, 0);
-                break;
-        }
-    }
-
-    private function IsConfigured() : bool
-    {
-        $host = $this->ReadPropertyString(self::PROPERTY_Host);
-        $password  = $this->ReadPropertyString(self::PROPERTY_Password);
-
-        return ($host !== false && $host != "" && $password !== false && $password != "");
-    }
-
-    public function OnTimerUpdateStatus()
-    {
-        $this->InternalUpdateStatus(false);
-    }
-
-    public function UpdateStatus() : bool
-    {
-        return $this->InternalUpdateStatus(true);
-    }
-
-    private function InternalUpdateStatus(bool $forceUpdate) : bool
-    {
-        if (!$this->IsConfigured())
-            return false;
-
-        $sprinklerController = $this->InitController();
-        if ($sprinklerController == false)
-            return false;
-
-        if (!$sprinklerController->Read($error))
-        {
-            $this->LogMessage("UpdateStatus Error: " . $error, KL_ERROR);
-            return false;
-        }
-
-        $this->UpdateVariableProfiles($sprinklerController);
-
-        $config = $sprinklerController->GetConfig(true);
-        $configMD5 = MD5(json_encode($config));
-        $this->SendDebug(__FUNCTION__, 'configMD5 old=' . $this->GetBuffer("Config") . ", new =$configMD5", 0);
-
-        if ($forceUpdate || $this->GetBuffer("Config") !== $configMD5)
-        {
-            $this->SendDebug(__FUNCTION__, "Configuration changed", 0);
-
-            SetValueBoolean($this->GetIDForIdent(self::VARIABLE_Enabled), $config->OperationEnable);
-            SetValueInteger($this->GetIDForIdent(self::VARIABLE_Sensor1), $config->Sensor1Type);
-            SetValueInteger($this->GetIDForIdent(self::VARIABLE_Sensor2), $config->Sensor2Type);
-            SetValueInteger($this->GetIDForIdent(self::VARIABLE_WeatherMethod), $config->WeatherMethod);
-            SetValueInteger($this->GetIDForIdent(self::VARIABLE_Waterlevel), $config->WaterLevel);
-
-            if ($config->RainDelay == 0)
-                SetValueString($this->GetIDForIdent(self::VARIABLE_RainDelay), $this->Translate("Not active"));
-            else
-                SetValueString($this->GetIDForIdent(self::VARIABLE_RainDelay), sprintf($this->Translate("Until %s"), $config->GetLocalRainDelayTimeAsString()));
-
-            $this->SetBuffer("Config", $configMD5);
-        }
-
-        $stations = $sprinklerController->GetStations();
-        $stationStatusMD5 = MD5(json_encode($stations));
-        $this->SendDebug(__FUNCTION__, 'stationStatusMD5 old=' . $this->GetBuffer("StationStatus") . ", new =$stationStatusMD5", 0);
-
-        if ($forceUpdate || $this->GetBuffer("StationStatus") !== $stationStatusMD5)
-        {
-            $this->SendDebug(__FUNCTION__, "Station status changed", 0);
-
-            $this->SendData(OpenSprinklerStation::class, OpenSprinklerStation::CMD_StationStatus, $stations);
-
-            $this->SetBuffer("StationStatus", $stationStatusMD5);
-        }
-
-        return true;
-    }
-
-    protected function SendData(string $destination, string $command, $data)
-    {
-        $sendData = [
-            'DataID' => OpenSprinklerStation::MODULE_GUID_RX,
-            self::MSGARG_Destination => $destination,
-            self::MSGARG_Command => $command,
-            self::MSGARG_Data => $data
-        ];
-
-        $this->SendDebug(__FUNCTION__, 'data=' . print_r($sendData, true), 0);
-
-        $this->SendDataToChildren(json_encode($sendData));
     }
 
     public function ReceiveData($jsonString)
@@ -429,10 +193,10 @@ class OpenSprinklerController extends BaseIPSModule
         // Empfangene Daten vom IO Modul
         $jsonMsg = json_decode($jsonString);
 
-        if (property_exists($jsonMsg, self::MSGARG_Destination)
-            && $jsonMsg->{self::MSGARG_Destination} == self::class
-            && property_exists($jsonMsg, self::MSGARG_Command)
-            && property_exists($jsonMsg, self::MSGARG_Data))
+        if (property_exists($jsonMsg, OpenSprinklerIO::MSGARG_Destination)
+            && $jsonMsg->{OpenSprinklerIO::MSGARG_Destination} == self::class
+            && property_exists($jsonMsg, OpenSprinklerIO::MSGARG_Command)
+            && property_exists($jsonMsg, OpenSprinklerIO::MSGARG_Data))
         {
             $this->ProcessMsg($jsonMsg);
         }
@@ -442,81 +206,74 @@ class OpenSprinklerController extends BaseIPSModule
     {
         $this->SendDebug(__FUNCTION__, "data=" . print_r($msg, true), 0);
 
-        $command = $msg->{self::MSGARG_Command};
+        $command = $msg->{OpenSprinklerIO::MSGARG_Command};
 
         switch ($command)
         {
+            case OpenSprinklerIO::CMD_ControllerConfig:
+                $sprinklerControllerConfig = new SprinklerControllerConfig($msg->{OpenSprinklerIO::MSGARG_Data});
 
+                SetValueBoolean($this->GetIDForIdent(self::VARIABLE_Enabled), $sprinklerControllerConfig->OperationEnable);
+                SetValueInteger($this->GetIDForIdent(self::VARIABLE_Sensor1), $sprinklerControllerConfig->Sensor1Type);
+                SetValueInteger($this->GetIDForIdent(self::VARIABLE_Sensor2), $sprinklerControllerConfig->Sensor2Type);
+                SetValueInteger($this->GetIDForIdent(self::VARIABLE_WeatherMethod), $sprinklerControllerConfig->WeatherMethod);
+                SetValueInteger($this->GetIDForIdent(self::VARIABLE_Waterlevel), $sprinklerControllerConfig->WaterLevel);
+
+                if ($sprinklerControllerConfig->RainDelay == 0)
+                    SetValueString($this->GetIDForIdent(self::VARIABLE_RainDelay), $this->Translate("Not active"));
+                else
+                    SetValueString($this->GetIDForIdent(self::VARIABLE_RainDelay), sprintf($this->Translate("Until %s"), $sprinklerControllerConfig->GetLocalRainDelayTimeAsString()));
+
+                break;
         }
     }
 
-    public function ForwardData($data)
+    private function GetConfig() : SprinklerControllerConfig
     {
-        if ($this->GetStatus() == IS_INACTIVE)
+        if ($this->HasActiveParent() == false)
         {
-            $this->SendDebug(__FUNCTION__, 'instance is inactive, skip', 0);
-            return false;
+            $this->SendDebug(__FUNCTION__, 'has no active parent', 0);
+            $this->LogMessage('has no active parent instance', KL_WARNING);
+
+            return new SprinklerControllerConfig;
         }
 
-        $jdata = json_decode($data, true);
-        $this->SendDebug(__FUNCTION__, 'data=' . print_r($jdata, true), 0);
+        $sendData = ['DataID' => OpenSprinklerIO::MODULE_GUID_RX, 'Command' => OpenSprinklerIO::CMD_GetControllerConfig];
+        $jsonConfig = $this->SendDataToParent(json_encode($sendData));
 
-        $ret = '';
-        $command = $jdata['Command'];
+        $this->SendDebug(__FUNCTION__, 'config=' . $jsonConfig, 0);
 
-        if (isset($command))
-        {
-            switch ($command)
-            {
-                case self::CMD_EnableStation:
-                    $result = $this->EnableStation($jdata[self::CMDPARAM_Index], $jdata[self::CMDPARAM_Enable]);
-                    break;
-
-                case self::CMD_SwitchStation:
-                    if (!$this->CheckProperties($jdata, $error, self::CMDPARAM_Index, self::CMDPARAM_Enable, self::CMDPARAM_Duration))
-                        return false;
-                    $result = $this->SwitchStation($jdata[self::CMDPARAM_Index], $jdata[self::CMDPARAM_Enable], $jdata[self::CMDPARAM_Duration]);
-                    break;
-
-                default:
-                    $this->SendDebug(__FUNCTION__, "Unknown Command: $command", 0);
-                    break;
-            }
-        }
-        else
-        {
-            $this->SendDebug(__FUNCTION__, 'Unknown Message Structure', 0);
-        }
-
-        $this->SendDebug(__FUNCTION__, 'ret=' . json_encode($ret), 0);
-
-        return json_encode($ret);
+        return new SprinklerControllerConfig(json_decode($jsonConfig));
     }
 
-    private function CheckProperties(array $properties, &$error, ...$propertyNames) : bool
+    private function GetStations()
     {
-        foreach($propertyNames as $propertyName)
+        if ($this->HasActiveParent() == false)
         {
-            if (!array_key_exists($propertyName, $properties))
-            {
-                $error = "Parameter $propertyName missing";
-                return false;
-            }
+            $this->SendDebug(__FUNCTION__, 'has no active parent', 0);
+            $this->LogMessage('has no active parent instance', KL_WARNING);
+
+            return [];
         }
 
-        return true;
+        $sendData = ['DataID' => OpenSprinklerIO::MODULE_GUID_RX, 'Command' => OpenSprinklerIO::CMD_GetStations];
+        $jsonStations = $this->SendDataToParent(json_encode($sendData));
+
+        $this->SendDebug(__FUNCTION__, 'stations=' . $jsonStations, 0);
+
+        return json_decode($jsonStations);
     }
 
-    private function FindStationInstance($stationInstanceIds, $controllerId, $stationIndex)
+    private function GetStationInstance($controllerId, $stationIndex)
     {
-        if ($stationInstanceIds == null)
-            $stationInstanceIds = IPS_GetInstanceListByModuleID(OpenSprinklerStation::MODULE_GUID);
+        $instanceIds = IPS_GetInstanceListByModuleID("{DE0EA757-F6F3-4CC7-3FD0-39622E94EB35}");
 
-        foreach ($stationInstanceIds as $stationInstanceId)
+        foreach ($instanceIds as $instanceId)
         {
-            if (IPS_GetProperty($stationInstanceId, OpenSprinklerStation::PROPERTY_Controller) == $controllerId
-                && IPS_GetProperty($stationInstanceId, OpenSprinklerStation::PROPERTY_Index) == $stationIndex)
-                return $stationInstanceId;
+            // ToDo: Check for correct controller
+
+            if (IPS_GetProperty($instanceId, OpenSprinklerStation::PROPERTY_Index) == $stationIndex)
+                return $instanceId;
         }
 
         return 0;
@@ -547,9 +304,20 @@ class OpenSprinklerController extends BaseIPSModule
         return $tree_position;
     }
 
+    public function EnableController(bool $enable)
+    {
+        $sendData = [
+            'DataID' => OpenSprinklerIO::MODULE_GUID_RX,
+            'Command' => OpenSprinklerIO::CMD_EnableController,
+            OpenSprinklerIO::CMDPARAM_Enable => $enable
+        ];
+
+        $this->SendDataToParent(json_encode($sendData));
+    }
+
     public function GetStationIndex(string $name) : int
     {
-        $this->GetStations($stations);
+        $stations = $this->GetStations();
 
         foreach ($stations as $station)
         {
@@ -560,81 +328,26 @@ class OpenSprinklerController extends BaseIPSModule
         return -1;
     }
 
-    private function GetControllerConfig(&$config) : bool
+    public function StopAllStations()
     {
-        $sprinklerController = $this->InitController();
-        if ($sprinklerController == false)
-            return false;
+        $sendData = [
+            'DataID' => OpenSprinklerIO::MODULE_GUID_RX,
+            'Command' => OpenSprinklerIO::CMD_StopAllStations
+        ];
 
-        $config = $sprinklerController->GetConfig();
-
-        return true;
+        $this->SendDataToParent(json_encode($sendData));
     }
 
-    private function GetStations(&$stations) : bool
+    public function RunProgram(string $programName, bool $useWeather = true)
     {
-        $sprinklerController = $this->InitController();
-        if ($sprinklerController == false)
-            return false;
+        $sendData = [
+            'DataID' => OpenSprinklerIO::MODULE_GUID_RX,
+            'Command' => OpenSprinklerIO::CMD_RunProgram,
+            OpenSprinklerIO::CMDPARAM_Name => $programName,
+            OpenSprinklerIO::CMDPARAM_UseWeather => $useWeather
+        ];
 
-        $stations = $sprinklerController->GetStations();
-
-        return true;
-    }
-
-    private function EnableController(bool $enable) : bool
-    {
-        $this->LogMessage("EnableController enable=$enable", KL_NOTIFY);
-
-        $sprinklerController = $this->InitController();
-        if ($sprinklerController == false)
-            return false;
-
-        return $sprinklerController->EnableController($enable, $error);
-    }
-
-    private function EnableStation(int $stationIndex, bool $enable) : bool
-    {
-        $this->LogMessage("EnableStation $stationIndex, enable=$enable", KL_NOTIFY);
-
-        $sprinklerController = $this->InitController();
-        if ($sprinklerController == false)
-            return false;
-
-        return $sprinklerController->EnableStation($stationIndex, $enable, $error);
-    }
-
-    private function SwitchStation(int $stationIndex, bool $enable, int $duration) : bool
-    {
-        $this->LogMessage("SwitchStation $stationIndex, enable=$enable, duration=$duration", KL_NOTIFY);
-
-        $sprinklerController = $this->InitController();
-        if ($sprinklerController == false)
-            return false;
-
-        return $sprinklerController->SwitchStation($stationIndex, $enable, $duration, $error);
-    }
-
-    private function RunProgram(string $programName, bool $useWeather) : bool
-    {
-        $this->LogMessage("RunProgram [$programName], useWeather=$useWeather", KL_NOTIFY);
-
-        $sprinklerController = $this->InitController();
-        if ($sprinklerController == false)
-            return false;
-
-        return $sprinklerController->RunProgram($programName, $useWeather, $error);
-    }
-
-    private function StopAllStations() : bool
-    {
-        $this->LogMessage("StopAllStations", KL_NOTIFY);
-
-        $sprinklerController = $this->InitController();
-        if ($sprinklerController == false)
-            return false;
-
-        return $sprinklerController->StopAllStations($error);
+        $this->SendDataToParent(json_encode($sendData));
     }
 }
 

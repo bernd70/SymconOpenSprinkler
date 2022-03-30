@@ -2,7 +2,7 @@
     "translations": {
         "de": {
             "Station Configuration": "Stationskonfiguration",
-            "Controller Id: %s": "Controller Id: %s",
+            "Station Index: %s": "Stationsindex: %s",
             "Polling Interval": "Abfrageintervall",
             "Activate exteded logging": "Erweitertes Logging aktivieren",
             "Enabled": "Aktiviert",

@@ -1,12 +1,6 @@
 {
     "translations": {
         "de": {
-            "Hostname or IP address": "Hostname oder IP Adresse",
-            "Polling Interval": "Abfrageintervall",
-            "seconds": "Sekunden",
-            "Password": "Passwort",
-            "Activate exteded logging": "Erweitertes Logging aktivieren",
-            "OpenSprinkler communications error (Check Host and password, Detail in Log)": "OpenSprinkler Kommunikationsfehler (Bitte Host und Passwort prüfen, Details im Log)",
             "Device time": "Gerätezeit",
             "Number of boards": "Anzahl Boards",
             "Category for new Sprinkler stations": "Kategorie für neue Bewässerungsstationen",
