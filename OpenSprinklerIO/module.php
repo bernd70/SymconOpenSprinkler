@@ -125,13 +125,13 @@ class OpenSprinklerIO extends BaseIPSModule
             return false;
 
         $sprinklerController = $this->InitController();
-        if ($sprinklerController == false)
+        if ($sprinklerController == null)
             return false;
 
         if (!$sprinklerController->Read($error))
         {
             $this->LogMessage("UpdateStatus Error: " . $error, KL_ERROR);
-            return false;
+            return null;
         }
 
         $this->UpdateVariableProfiles($sprinklerController);
@@ -347,7 +347,7 @@ class OpenSprinklerIO extends BaseIPSModule
     private function GetControllerConfig(&$config) : bool
     {
         $sprinklerController = $this->InitController();
-        if ($sprinklerController == false)
+        if ($sprinklerController == null)
             return false;
 
         $config = $sprinklerController->GetConfig();
@@ -358,7 +358,7 @@ class OpenSprinklerIO extends BaseIPSModule
     private function GetStations(&$stations) : bool
     {
         $sprinklerController = $this->InitController();
-        if ($sprinklerController == false)
+        if ($sprinklerController == null)
             return false;
 
         $stations = $sprinklerController->GetStations();
@@ -371,8 +371,7 @@ class OpenSprinklerIO extends BaseIPSModule
         $this->LogMessage("EnableController enable=$enable", KL_NOTIFY);
 
         $sprinklerController = $this->InitController();
-
-        if ($sprinklerController == false)
+        if ($sprinklerController == null)
             return false;
 
         return $sprinklerController->EnableController($enable, $error);
@@ -383,7 +382,7 @@ class OpenSprinklerIO extends BaseIPSModule
         $this->LogMessage("EnableStation $stationIndex, enable=$enable", KL_NOTIFY);
 
         $sprinklerController = $this->InitController();
-        if ($sprinklerController == false)
+        if ($sprinklerController == null)
             return false;
 
         return $sprinklerController->EnableStation($stationIndex, $enable, $error);
@@ -394,7 +393,7 @@ class OpenSprinklerIO extends BaseIPSModule
         $this->LogMessage("GetStationStatus $stationIndex", KL_NOTIFY);
 
         $sprinklerController = $this->InitController();
-        if ($sprinklerController == false)
+        if ($sprinklerController == null)
             return false;
 
         try
@@ -415,7 +414,7 @@ class OpenSprinklerIO extends BaseIPSModule
         $this->LogMessage("SwitchStation $stationIndex, enable=$enable, duration=$duration", KL_NOTIFY);
 
         $sprinklerController = $this->InitController();
-        if ($sprinklerController == false)
+        if ($sprinklerController == null)
             return false;
 
         return $sprinklerController->SwitchStation($stationIndex, $enable, $duration, $error);
@@ -437,7 +436,7 @@ class OpenSprinklerIO extends BaseIPSModule
         $this->LogMessage("SetRainDelay hours=$hours", KL_NOTIFY);
 
         $sprinklerController = $this->InitController();
-        if ($sprinklerController == false)
+        if ($sprinklerController == null)
             return false;
 
         return $sprinklerController->SetRainDleay($hours, $error);
@@ -449,7 +448,7 @@ class OpenSprinklerIO extends BaseIPSModule
         $this->LogMessage("StopAllStations", KL_NOTIFY);
 
         $sprinklerController = $this->InitController();
-        if ($sprinklerController == false)
+        if ($sprinklerController == null)
             return false;
 
         return $sprinklerController->StopAllStations($error);
