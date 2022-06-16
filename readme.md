@@ -1,8 +1,8 @@
 # SymconOpenSprinkler
 
-SymconOpenSprinkler ist ein Erweiterungsmodul für IP-Symcon und dient dazu, einen OpenSprinkler Bewässerungscomputer zu steuern.
+SymconOpenSprinkler ist ein Erweiterungsmodul für IP-Symcon und dient dazu, einen OpenSprinkler Bewässerungscomputer zu überwachen und zu steuern.
 
-Fragen und Diskussion zum Modul bitte im Symcon Forum. [Link zum Thread](https://community.symcon.de/tbd)
+ACHTUNG: Das Modul befindet sich im frühen Entwicklungsstadium! Es ist zu erwarten, dass Fehler auftreten.
 
 ### Inhalt
 
@@ -18,7 +18,23 @@ Fragen und Diskussion zum Modul bitte im Symcon Forum. [Link zum Thread](https:/
 
 Derzeit ist folgende Basisfunktionalität implementiert:
 
-- tbd
+__Controller__
+
+- Statusanzeige
+- Konfiguration Regenverzögerung
+- Programm starten
+
+__Sprinkler Station__
+
+- Statusanzeige
+- Konfiguration (Aktiviert/Deaktiviert, Wettergesteuert, Nacheinander)
+- Starten und Stoppen
+
+__Offene Punkte__
+
+- Variable zum Schalten über UI
+- Error handling
+- Test für Geräte mit zweitem Board (Sprinkleranzahl > 8)
 
 ### 2. Voraussetzungen
 
@@ -33,19 +49,10 @@ Die Einrichtung erfolgt über die Modulverwaltung von Symcon.
 
 Danach können OpenSprinkler Instanzen erstellt werden.
 
-##### Besonderheiten beim Update
-
-__Vx.x --> Vy.y__
-
-- tbd
-
 ### 4. Konfiguration
 
-__Konfigurationsseite__
-
-Name                           | Beschreibung
------------------------------- | ----------------------------------------------
-tbd                            | tbd
+OpenSprinklerIO Instanz anlegen mit Adresse (Name oder IP) und Gerätepasswort des Sprinkler Controllers sowie dem Pollig Intervall.
+OpenSprinkklerController Instanz anlegen. Alle Sprinkler sollten automatisch gefunden werden und können als Instanzen in der definierbaren Kategorie erstellt werden.
 
 ### 5. Variablen und Variablenprofile
 
@@ -53,20 +60,38 @@ Die Variablen und Variablenprofile werden automatisch angelegt.
 
 #### Variablen
 
-Die nachfolgenden Variablen stehen zur Verfügung und werden zyklisch aktualisiert. Teilweise besteht eine Voraussetzung für das Lesen der Information.
-
-Name          | Typ                                 | Beschreibung                            | Lese-Voraussetzung       | Anmerkung
-------------- | ----------------------------------- | --------------------------------------- | ------------------------ | ----------------------------------
-tbd           | String                              | tbd                                     |                          | tbd
+Die zur Verfügung stehende Variablen werden zyklisch aktualisiert.
 
 #### Variablenprofile
 
-__OpenSprinkler.tbd__
+__OpenSprinkler.StationStatus__
 
 Wert | Bezeichnung     | Anmerkung
 ---- | --------------- | -----------------
-0    | tbd             | tbd
+0    | Unbekannt       |
+1    | Deaktiviert     |
+2    | Leerlauf        |
+3    | Geplant         |
+4    | Aktiv           |
 
+__OpenSprinkler.WeatherMethod__
+
+Wert | Bezeichnung                        | Anmerkung
+---- | ---------------------------------- | ------------------
+0    | Manuelle Steuerung                 |
+1    | Zimmermann                         |
+2    | Automatische Verzögerung bei Regen |
+3    | Evapotranspiration                 |
+
+__OpenSprinkler.SensorType__
+
+Wert | Bezeichnung     | Anmerkung
+---- | --------------- | -----------------
+0    | Nicht aktiv     |
+1    | Regen           |
+2    | Durchfluss      |
+3    | Bodenfeuchte    |
+240  | Programm        |
 
 ### 6. PHP-Befehlsreferenz
 
@@ -93,7 +118,7 @@ OpenSprinkler_RunProgram(integer $constrollerInstanceId, string $programName, bo
 Startet ein Beregnungsprogramm über den Namen. Zusätzlich kann festgelegt werden, ob die wetterabhängige Steuerung genuzt werden soll.
 
 ```php
-OpenSprinkler_SetRainDela(integer $hours);
+OpenSprinkler_SetRainDelay(integer $hours);
 ```
 Aktiviert die Regenverzögerung für die angegebene Anzahl von Stunden. Bei $hours = 0 wird die Regenverzögerung ausgeschaltet.
 
