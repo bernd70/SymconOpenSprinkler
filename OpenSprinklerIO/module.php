@@ -131,7 +131,7 @@ class OpenSprinklerIO extends BaseIPSModule
         if (!$sprinklerController->Read($error))
         {
             $this->LogMessage("UpdateStatus Error: " . $error, KL_ERROR);
-            return null;
+            return false;
         }
 
         $this->UpdateVariableProfiles($sprinklerController);
@@ -170,7 +170,7 @@ class OpenSprinklerIO extends BaseIPSModule
         if (!$sprinklerController->Read($error))
         {
             $this->LogMessage("UpdateStatus Error: " . $error, KL_ERROR);
-            return false;
+            return null;
         }
 
         return $sprinklerController;
