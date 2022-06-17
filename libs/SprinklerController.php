@@ -196,21 +196,20 @@ class SprinklerController
             $request = curl_init($url);
 
             curl_setopt($request, CURLOPT_USERAGENT, "SymconOpenSprinkler");
-            curl_setopt($request, CURLOPT_CONNECTTIMEOUT, 5);
-            curl_setopt($request, CURLOPT_TIMEOUT, 5);
+            curl_setopt($request, CURLOPT_CONNECTTIMEOUT, 10);
+            curl_setopt($request, CURLOPT_TIMEOUT, 10);
             curl_setopt($request, CURLOPT_RETURNTRANSFER, 1);
 
             $result = curl_exec($request);
             $status = curl_getinfo($request, CURLINFO_HTTP_CODE);
+            curl_close($request);
 
             $this->Log(self::LOG_DEBUG, __FUNCTION__, "Attempt $attempt: Result=$result, Status=$status");
-
-            curl_close($request);
 
             if ($result !== false && $status == 200 /* HTTP_OK */)
                 break;
 
-            $this->Log(self::LOG_DEBUG, __FUNCTION__, "Web Request Error on attempt $attempt: $error");
+            $this->Log(self::LOG_DEBUG, __FUNCTION__, "Web Request Error on attempt $attempt");
             $attempt++;
 
             sleep(1);
@@ -219,7 +218,7 @@ class SprinklerController
         if ($attempt > $this->retries)
         {
             if ($result === false)
-                $error = "Empty or no result received (status=$status)";
+                $error = "No result received (status=$status)";
             else if ($status != 200)
                 $error = "HTTP error code $status received";
             else
