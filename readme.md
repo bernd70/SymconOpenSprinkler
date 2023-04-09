@@ -12,7 +12,7 @@ ACHTUNG: Das Modul befindet sich im frühen Entwicklungsstadium! Es ist zu erwar
 4. [Konfiguration](#4-konfiguration)
 5. [Variablen und Variablenprofile](#5-variablen-und-variablenprofile)
 6. [PHP-Befehlsreferenz](#6-php-befehlsreferenz)
-7. [Anhang](#7-anhang)
+7. [Versioninformation](#7-versionsinformation)
 
 ### 1. Funktionsumfang
 
