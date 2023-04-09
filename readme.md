@@ -10,9 +10,9 @@ ACHTUNG: Das Modul befindet sich im frühen Entwicklungsstadium! Es ist zu erwar
 2. [Voraussetzungen](#2-voraussetzungen)
 3. [Installation](#3-installation)
 4. [Konfiguration](#4-konfiguration)
-5. [Variablen und Variablenprofile](#4-variablen-und-variablenprofile)
-6. [PHP-Befehlsreferenz](#5-php-befehlsreferenz)
-7. [Anhang](#6-anhang)
+5. [Variablen und Variablenprofile](#5-variablen-und-variablenprofile)
+6. [PHP-Befehlsreferenz](#6-php-befehlsreferenz)
+7. [Anhang](#7-anhang)
 
 ### 1. Funktionsumfang
 
@@ -131,4 +131,16 @@ Liefert den Index einer Bewässerungsstation für einen bestimmten Controller ü
 OpenSprinkler_UpdateStatus(integer $constrollerInstanceId);
 ```
 Liest den Controller neu aus und aktualisiert die IP-Symcon Variablen. Der Aufruf erfolgt zyklisch und muss nicht manuell erfolgen.
+
+
+### 7. Versioninformation
+
+#### v1.0
+
+- Initial Release
+
+#### v1.1
+
+- Option Serialized wird nicht mehr unterstützt, da sie ab OpenSprinkler Firmware 2.20 nicht mehr vorhanden ist.
+- Firmware wind in Controller Configuration mit ausgegeben
 
