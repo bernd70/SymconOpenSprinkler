@@ -21,7 +21,6 @@ class SprinklerStation
     var $WeatherAdjusted = false;
     var $Sensor1Enabled = false;
     var $Sensor2Enabled = false;
-    var $Serialized = false;
 
     function __construct(int $index, string $name, bool $enabled, bool $active)
     {
@@ -44,12 +43,11 @@ class SprinklerStation
         foreach ($stdClass AS $key => $value) $this->{$key} = $value;
     }
 
-    public function SetOptions(bool $weatherAdjusted, $sensor1Enabled, $sensor2Enabled, bool $serialized)
+    public function SetOptions(bool $weatherAdjusted, $sensor1Enabled, $sensor2Enabled)
     {
         $this->WeatherAdjusted = $weatherAdjusted;
         $this->Sensor1Enabled = $sensor1Enabled;
         $this->Sensor2Enabled = $sensor2Enabled;
-        $this->Serialized = $serialized;
     }
 
     public function SetScheduled(bool $scheduled, int $duration, int $time)

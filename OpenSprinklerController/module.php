@@ -121,6 +121,11 @@ class OpenSprinklerController extends BaseIPSModule
                 ],
                 [
                     "type" => "Label",
+                    "name" => "FirmwareVersion",
+                    "caption" =>  $this->Translate("Firmware Version") . ": " . $config->GetFirmwareVersionAsString()
+                ],
+                [
+                    "type" => "Label",
                     "name" => "NumberOfBoards",
                     "caption" => $this->Translate("Number of boards") . ": $config->NumberOfBoards"
                 ]

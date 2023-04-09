@@ -15,7 +15,6 @@ class OpenSprinklerStation extends BaseIPSModule
     const VARIABLE_WeatherAdjusted = "WeatherAdjusted";
     const VARIABLE_Sensor1Enabled = "Sensor1Enabled";
     const VARIABLE_Sensor2Enabled = "Sensor2Enabled";
-    const VARIABLE_Serialized = "Serialized";
 
     const CMD_StationStatus = "StationStatus"; // Data darf ein Array sein oder ein einzelnes Objekt
 
@@ -77,10 +76,8 @@ class OpenSprinklerStation extends BaseIPSModule
 
         $this->RegisterVariableBoolean(self::VARIABLE_WeatherAdjusted, $this->Translate("WeatherAdjusted"), "~Switch", 10);
         // VARIABLE_Sensor1Enabled und VARIABLE_Sensor2Enabled werden automatisch und nur dann erstellt, wenn am Controller vorhanden
-        $this->RegisterVariableBoolean(self::VARIABLE_Serialized, $this->Translate("Serialized"), "~Switch", 13);
 
         $this->EnableAction(self::VARIABLE_WeatherAdjusted);
-        $this->EnableAction(self::VARIABLE_Serialized);
     }
 
     public function GetConfigurationForm()
@@ -202,10 +199,6 @@ class OpenSprinklerStation extends BaseIPSModule
             case self::VARIABLE_Sensor2Enabled:
                 // TBD
                 break;
-
-            case self::VARIABLE_Serialized:
-                // TBD
-                break;
         }
     }
 
@@ -242,8 +235,6 @@ class OpenSprinklerStation extends BaseIPSModule
             SetValueBoolean($this->GetIDForIdent(self::VARIABLE_Sensor2Enabled), $stationData->Sensor2Enabled);
             $this->EnableAction(self::VARIABLE_Sensor2Enabled);
         }
-
-        SetValueBoolean($this->GetIDForIdent(self::VARIABLE_Serialized), $stationData->Serialized);
     }
 
     public function EnableStation(bool $enable)

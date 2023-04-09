@@ -27,6 +27,7 @@ class SprinklerControllerConfig
     const WEATHERMETHOD_Evapotranspiration = 3;
 
     var $DeviceTime = 0;
+    var $FirmwareVersion = 0;
     var $NumberOfBoards = 0;
     var $OperationEnable = false;
     var $Sensor1Type = self::SENSORTYPE_Inactive;
@@ -41,6 +42,14 @@ class SprinklerControllerConfig
             return "Undefined";
 
         return $this->LocalToUtcTime($this->DeviceTime)->format($format);
+    }
+
+    function GetFirmwareVersionAsString()
+    {
+        $majorVersion = floor($this->FirmwareVersion / 100);
+        $minorVersion = $this->FirmwareVersion % 100;
+
+        return $majorVersion . "." . $minorVersion;
     }
 
     function GetLocalRainDelayTimeAsString(string $format = self::DATETIMEFORMAT_Default) : string

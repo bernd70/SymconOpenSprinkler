@@ -14,8 +14,7 @@
             "Scheduled": "Geplant",
             "WeatherAdjusted": "Wettergesteuert",
             "Sensor 1 enabled": "Sensor 1 aktiv",
-            "Sensor 2 enabled": "Sensor 2 aktiv",
-            "Serialized": "Nacheinander"
+            "Sensor 2 enabled": "Sensor 2 aktiv"
         }
     }
 }

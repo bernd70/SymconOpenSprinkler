@@ -278,6 +278,7 @@ class SprinklerController
         GetJsonProperty($jsonDataSettings, "devt", $this->SprinklerControllerConfig->DeviceTime, 0);
         GetJsonProperty($jsonDataSettings, "nbrd", $this->SprinklerControllerConfig->NumberOfBoards, 1);
 
+        GetJsonProperty($jsonDataOptions, "fwv", $this->SprinklerControllerConfig->FirmwareVersion, 0);
         GetJsonProperty($jsonDataOptions, "sn1t", $this->SprinklerControllerConfig->Sensor1Type, SprinklerControllerConfig::SENSORTYPE_Inactive);
         GetJsonProperty($jsonDataOptions, "sn2t", $this->SprinklerControllerConfig->Sensor2Type, SprinklerControllerConfig::SENSORTYPE_Inactive);
 
@@ -333,12 +334,6 @@ class SprinklerController
             $error = "Section [stations/ignore_sn2] missing from json";
             return false;
         }
-        $jsonDataSerialized = null;
-        if (!GetJsonProperty($jsonDataStations, "stn_seq", $jsonDataSerialized))
-        {
-            $error = "Section [stations/stn_seq] missing from json";
-            return false;
-        }
 
         foreach ($jsonDataStations->snames as $key => $stationName)
         {
@@ -350,7 +345,6 @@ class SprinklerController
 
             GetSprinklerOptionFromArray($jsonDataIgnoreRain, $key, $ignoreRain);
             GetSprinklerOptionFromArray($jsonDataIgnoreSensor2, $key, $ignoreSensor2);
-            GetSprinklerOptionFromArray($jsonDataSerialized, $key, $serialized);
 
             $sensor1Enabled = null;
             if ($this->SprinklerControllerConfig->Sensor1Type != SprinklerControllerConfig::SENSORTYPE_Inactive)
@@ -360,7 +354,7 @@ class SprinklerController
             if ($this->SprinklerControllerConfig->Sensor2Type != SprinklerControllerConfig::SENSORTYPE_Inactive)
                 GetSprinklerOptionFromArray($jsonDataIgnoreSensor2, $key, $sensor2Enabled, true);
 
-            $station->SetOptions(!$ignoreRain, $sensor1Enabled, $sensor2Enabled, $serialized);
+            $station->SetOptions(!$ignoreRain, $sensor1Enabled, $sensor2Enabled);
 
             $schedule = $jsonDataProgramStatus[$key];
             if ($schedule[0] != 0)
@@ -447,6 +441,7 @@ class SprinklerController
 
             unset($config->DeviceTime);
             unset($config->NumberOfBoards);
+            unset($config->FirmwareVersion);
 
             return $config;
         }
@@ -484,6 +479,7 @@ class SprinklerController
     public function Dump()
     {
         print("Device Time: " . $this->SprinklerControllerConfig->GetLocalDeviceTimeAsString() . "\n");
+        print("Firmware Version: " . $this->SprinklerControllerConfig->FirmwareVersion . "\n");
         print("Number of Boards: " . $this->SprinklerControllerConfig->NumberOfBoards . "\n");
         print("Operation Enable: " . ($this->SprinklerControllerConfig->OperationEnable ? "Yes" : "No") . "\n");
 
