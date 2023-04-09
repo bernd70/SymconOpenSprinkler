@@ -133,7 +133,7 @@ OpenSprinkler_UpdateStatus(integer $constrollerInstanceId);
 Liest den Controller neu aus und aktualisiert die IP-Symcon Variablen. Der Aufruf erfolgt zyklisch und muss nicht manuell erfolgen.
 
 
-### 7. Versioninformation
+### 7. Versionsinformation
 
 #### v1.0
 
